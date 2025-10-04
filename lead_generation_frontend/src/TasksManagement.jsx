@@ -13,7 +13,9 @@ import {
     Type,
     Database,
     Map,
-    List
+    List,
+    Clock,
+    Check
 } from 'lucide-react';
 
 const TasksManagement = () => {
@@ -21,6 +23,8 @@ const TasksManagement = () => {
     const [editingTask, setEditingTask] = useState(null);
     const [editScheduledTime, setEditScheduledTime] = useState('');
     const [editTaskName, setEditTaskName] = useState('');
+    const [editRepeat, setEditRepeat] = useState('');
+    const [editMaxItems, setEditMaxItems] = useState('');
     const [loading, setLoading] = useState(false);
     const [pageLoading, setPageLoading] = useState(true);
     const [response, setResponse] = useState(null);
@@ -46,7 +50,6 @@ const TasksManagement = () => {
 
     const handleEditClick = (task) => {
         setEditingTask(task.id);
-        // Format for datetime-local input: YYYY-MM-DDTHH:mm
         const localDate = new Date(task.scheduled_time);
         const formattedDate = localDate.getFullYear() + '-' +
             ('0' + (localDate.getMonth() + 1)).slice(-2) + '-' +
@@ -55,6 +58,8 @@ const TasksManagement = () => {
             ('0' + localDate.getMinutes()).slice(-2);
         setEditScheduledTime(formattedDate);
         setEditTaskName(task.task_name);
+        setEditRepeat(task.repeat || 'once');
+        setEditMaxItems(task.max_items || '');
         setResponse(null);
     };
 
@@ -62,6 +67,8 @@ const TasksManagement = () => {
         setEditingTask(null);
         setEditScheduledTime('');
         setEditTaskName('');
+        setEditRepeat('');
+        setEditMaxItems('');
     };
 
     const handleUpdateTask = async (taskId) => {
@@ -73,7 +80,9 @@ const TasksManagement = () => {
         try {
             const requestData = {
                 scheduled_time: new Date(editScheduledTime).toISOString(),
-                task_name: editTaskName || undefined
+                task_name: editTaskName || undefined,
+                repeat: editRepeat || undefined,
+                max_items: editMaxItems !== '' ? Number(editMaxItems) : 0
             };
             const res = await fetch(`http://127.0.0.1:8000/task/update-task/${taskId}`, {
                 method: 'PUT',
@@ -121,18 +130,17 @@ const TasksManagement = () => {
     };
 
     const getStatusBadge = (scheduledTime) => {
-        const isFuture = new Date(scheduledTime) > new Date();
+        const isUpcoming = new Date(scheduledTime) > new Date();
         return (
-            <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${isFuture ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>
-                {isFuture ? <CheckCircle size={14} /> : <AlertCircle size={14} />}
-                {isFuture ? 'Scheduled' : 'Overdue'}
+            <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${isUpcoming ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
+                {isUpcoming ? <Clock size={14} /> : <Check size={14} />}
+                {isUpcoming ? 'Upcoming' : 'Passed'}
             </span>
         );
     };
 
     const sortedTasks = [...tasks].sort((a, b) => new Date(a.scheduled_time) - new Date(b.scheduled_time));
-    const scheduledCount = tasks.filter(task => new Date(task.scheduled_time) > new Date()).length;
-    const overdueCount = tasks.length - scheduledCount;
+    const upcomingCount = tasks.filter(task => new Date(task.scheduled_time) > new Date()).length;
 
     if (pageLoading) {
         return (
@@ -168,18 +176,14 @@ const TasksManagement = () => {
 
                     <div className="p-6">
                         {/* Stats Section */}
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
                             <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 text-center">
-                                <h4 className="text-sm font-semibold text-gray-500">Total Tasks</h4>
+                                <h4 className="text-sm font-semibold text-gray-500">Total Scheduled</h4>
                                 <p className="text-3xl font-bold text-gray-900 mt-1">{tasks.length}</p>
                             </div>
                             <div className="bg-green-50 border border-green-200 rounded-xl p-4 text-center">
-                                <h4 className="text-sm font-semibold text-green-700">Scheduled</h4>
-                                <p className="text-3xl font-bold text-green-600 mt-1">{scheduledCount}</p>
-                            </div>
-                            <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 text-center">
-                                <h4 className="text-sm font-semibold text-yellow-700">Overdue</h4>
-                                <p className="text-3xl font-bold text-yellow-600 mt-1">{overdueCount}</p>
+                                <h4 className="text-sm font-semibold text-green-700">Upcoming</h4>
+                                <p className="text-3xl font-bold text-green-600 mt-1">{upcomingCount}</p>
                             </div>
                         </div>
 
@@ -210,9 +214,38 @@ const TasksManagement = () => {
                                                         <input type="text" value={editTaskName} onChange={(e) => setEditTaskName(e.target.value)} className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500" />
                                                     </div>
                                                     <div className="space-y-1">
+                                                        <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                                                            Max Items
+                                                        </label>
+                                                        <input
+                                                            type="number"
+                                                            value={editMaxItems}
+                                                            onChange={(e) => setEditMaxItems(e.target.value)}
+                                                            className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500"
+                                                        />
+                                                    </div>
+
+                                                    <div className="space-y-1">
                                                         <label className="text-sm font-medium text-gray-700 flex items-center gap-2"><Calendar size={16} />Scheduled Time *</label>
                                                         <input type="datetime-local" value={editScheduledTime} onChange={(e) => setEditScheduledTime(e.target.value)} required className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500" />
                                                     </div>
+                                                    <div className="space-y-1">
+                                                        <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                                                            <Clock size={16} />Repeat
+                                                        </label>
+                                                        <select
+                                                            value={editRepeat}
+                                                            onChange={(e) => setEditRepeat(e.target.value)}
+                                                            className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500"
+                                                        >
+                                                            <option value="once">Once</option>
+                                                            <option value="daily">Daily</option>
+                                                            <option value="weekly">Weekly</option>
+                                                            <option value="monthly">Monthly</option>
+                                                            <option value="yearly">Yearly</option>
+                                                        </select>
+                                                    </div>
+
                                                     <div className="flex justify-end items-center gap-3 pt-2">
                                                         <button onClick={() => handleUpdateTask(task.id)} disabled={loading} className="inline-flex items-center justify-center gap-2 px-4 py-2 font-medium text-white bg-gradient-to-b from-teal-600 to-teal-700 rounded-lg hover:bg-teal-700 disabled:bg-gray-400">
                                                             {loading ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />} Update
@@ -234,6 +267,15 @@ const TasksManagement = () => {
                                                             <div className="flex items-center gap-2"><Map size={16} className="text-teal-500" /><span className="font-medium text-gray-800">Mapping:</span>{task.mapping_name}</div>
                                                             <div className="flex items-center gap-2"><List size={16} className="text-teal-500" /><span className="font-medium text-gray-800">Entity:</span>{task.entity_name}</div>
                                                             <div className="flex items-center gap-2"><Calendar size={16} className="text-teal-500" /><span className="font-medium text-gray-800">Scheduled:</span>{formatDateTime(task.scheduled_time)}</div>
+                                                            <div className="flex items-center gap-2">
+                                                                <Clock size={16} className="text-teal-500" />
+                                                                <span className="font-medium text-gray-800">Repeat:</span>{task.repeat || 'once'}
+                                                            </div>
+                                                            <div className="flex items-center gap-2">
+                                                                <Clock size={16} className="text-teal-500" />
+                                                                <span className="font-medium text-gray-800">Last Executed:</span>
+                                                                {task.last_executed_at ? formatDateTime(task.last_executed_at) : 'Never'}
+                                                            </div>
                                                         </div>
                                                     </div>
                                                     <div className="flex sm:flex-col items-end gap-3 self-end sm:self-auto shrink-0">

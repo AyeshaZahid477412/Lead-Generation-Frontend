@@ -25,6 +25,10 @@ const TaskScheduler = () => {
     const [loading, setLoading] = useState(false);
     const [response, setResponse] = useState(null);
     const [activeTab, setActiveTab] = useState('create');
+    const [repeat, setRepeat] = useState('once'); // default once
+    const [maxItems, setMaxItems] = useState(10); // default 10
+
+
 
     // Fetch initial data
     useEffect(() => {
@@ -64,7 +68,8 @@ const TaskScheduler = () => {
             const res = await fetch(`http://127.0.0.1:8000/mapping/mappings-by-source/${sourceId}`);
             const data = await res.json();
             if (data.success) {
-                setMappings(data.mappings || []);
+                const mappings = data.mappings.filter(m => m.enabled === true);
+                setMappings(mappings);
                 setSelectedMappingId('');
             } else {
                 setMappings([]);
@@ -93,7 +98,9 @@ const TaskScheduler = () => {
                 source_id: parseInt(selectedSourceId),
                 mapping_id: parseInt(selectedMappingId),
                 scheduled_time: new Date(scheduledTime).toISOString(),
-                task_name: taskName || undefined
+                repeat: repeat,
+                task_name: taskName || undefined,
+                max_items: maxItems ? parseInt(maxItems) : 10
             };
             const res = await fetch('http://127.0.0.1:8000/task/create-task', {
                 method: 'POST',
@@ -224,9 +231,40 @@ const TaskScheduler = () => {
                                     <input type="text" value={taskName} onChange={(e) => setTaskName(e.target.value)} placeholder="Auto-generated if empty" className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500" />
                                 </div>
                                 <div className="p-5 bg-gray-50 rounded-xl border border-gray-200 space-y-2">
+                                    <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
+                                        <Type size={16} className="text-teal-500" />Max Items
+                                    </label>
+                                    <input
+                                        type="number"
+                                        value={maxItems}
+                                        onChange={(e) => setMaxItems(e.target.value)}
+                                        min={1}
+                                        className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                                    />
+                                </div>
+
+                                <div className="p-5 bg-gray-50 rounded-xl border border-gray-200 space-y-2">
                                     <label className="flex items-center gap-2 text-sm font-medium text-gray-700"><Calendar size={16} className="text-teal-500" />Scheduled Time *</label>
                                     <input type="datetime-local" value={scheduledTime} onChange={(e) => setScheduledTime(e.target.value)} required className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500" />
                                 </div>
+                                <div className="p-5 bg-gray-50 rounded-xl border border-gray-200 space-y-2">
+                                    <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
+                                        <RefreshCw size={16} className="text-teal-500" />Repeat *
+                                    </label>
+                                    <select
+                                        value={repeat}
+                                        onChange={(e) => setRepeat(e.target.value)}
+                                        required
+                                        className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                                    >
+                                        <option value="once">Once</option>
+                                        <option value="daily">Daily</option>
+                                        <option value="weekly">Weekly</option>
+                                        <option value="monthly">Monthly</option>
+                                        <option value="yearly">Yearly</option>
+                                    </select>
+                                </div>
+
                                 <div className="flex justify-end pt-2">
                                     <button type="submit" disabled={loading} className="inline-flex items-center justify-center gap-2 px-6 py-3 font-medium text-white bg-gradient-to-b from-teal-600 to-teal-400 rounded-lg shadow-sm hover:bg-teal-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-teal-500 disabled:bg-gray-400 disabled:cursor-not-allowed">
                                         {loading ? <Loader2 size={20} className="animate-spin" /> : <Plus size={20} />}
@@ -255,6 +293,15 @@ const TaskScheduler = () => {
                                                         <div className="flex items-center gap-2"><Map size={16} className="text-teal-500" /><span className="font-medium text-gray-800">Mapping:</span>{task.mapping_name}</div>
                                                         <div className="flex items-center gap-2"><List size={16} className="text-teal-500" /><span className="font-medium text-gray-800">Entity:</span>{task.entity_name}</div>
                                                         <div className="flex items-center gap-2"><Calendar size={16} className="text-teal-500" /><span className="font-medium text-gray-800">Scheduled:</span>{formatDateTime(task.scheduled_time)}</div>
+                                                        <div className="flex items-center gap-2">
+                                                            <RefreshCw size={16} className="text-teal-500" />
+                                                            <span className="font-medium text-gray-800">Repeat:</span> {task.repeat}
+                                                        </div>
+                                                        <div className="flex items-center gap-2">
+                                                            <CheckCircle size={16} className="text-teal-500" />
+                                                            <span className="font-medium text-gray-800">Last Executed:</span>
+                                                            {task.last_executed_at ? formatDateTime(task.last_executed_at) : 'Never'}
+                                                        </div>
                                                     </div>
                                                 </div>
                                                 <div className="flex sm:flex-col items-end gap-3 self-end sm:self-auto">

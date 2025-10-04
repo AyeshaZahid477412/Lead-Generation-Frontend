@@ -223,6 +223,15 @@ const TaskExecution = () => {
                             <div className="flex items-center gap-2"><Map size={16} className="text-teal-500" /><span className="font-medium text-gray-800">Mapping:</span> {task.mapping_name}</div>
                             <div className="flex items-center gap-2"><List size={16} className="text-teal-500" /><span className="font-medium text-gray-800">Entity:</span> {task.entity_name}</div>
                             <div className="flex items-center gap-2"><Calendar size={16} className="text-teal-500" /><span className="font-medium text-gray-800">Scheduled:</span> {formatDateTime(task.scheduled_time)}</div>
+                            <div className="flex items-center gap-2">
+                              <RefreshCw size={16} className="text-teal-500" />
+                              <span className="font-medium text-gray-800">Repeat:</span> {task.repeat}
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <CheckCircle size={16} className="text-teal-500" />
+                              <span className="font-medium text-gray-800">Last Executed:</span>
+                              {task.last_executed_at ? formatDateTime(task.last_executed_at) : 'Never'}
+                            </div>
                           </div>
                         </div>
                         <div className="flex sm:flex-col items-end gap-3 self-end sm:self-auto shrink-0">
@@ -275,12 +284,10 @@ const TaskExecution = () => {
                                 {formatDateTime(executionHistory[task.id].scheduled_time)}
                               </div>
                               <div className="flex items-center gap-2">
-                                <span className="font-medium text-gray-900">Status:</span>
-                                {new Date(executionHistory[task.id].scheduled_time) <= new Date() ?
-                                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800"><AlertCircle size={14} /> Ready</span> :
-                                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800"><CheckCircle size={14} /> Waiting</span>
-                                }
+                                  <span className="font-medium text-gray-900">Max Items:</span>
+                                  {executionHistory[task.id].max_items}
                               </div>
+
                             </div>
                           )}
                         </div>
