@@ -279,6 +279,12 @@ export default function WebScraperLanding() {
               transition: 'all 0.3s',
               fontSize: '15px'
             }}
+            onClick={() => {
+                document.getElementById('contact us')?.scrollIntoView({
+                behavior: 'smooth',
+                block: 'start'
+              });
+            }}
             onMouseEnter={(e) => {
               e.target.style.backgroundColor = 'white';
               e.target.style.color = '#00364A';
@@ -293,7 +299,7 @@ export default function WebScraperLanding() {
               e.target.style.transform = 'translateY(0)';
               e.target.style.boxShadow = 'none';
             }}>
-              Get started for free
+              Contact Us
             </button>
           </div>
         </div>
@@ -1147,7 +1153,9 @@ export default function WebScraperLanding() {
           opacity: 0.2
         }} />
 
-        <div style={{
+        <div 
+        id="contact us"
+        style={{
           maxWidth: '1000px',
           margin: '0 auto',
           display: 'flex',
