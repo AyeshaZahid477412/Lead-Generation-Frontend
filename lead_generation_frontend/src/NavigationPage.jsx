@@ -8,11 +8,13 @@ import {
   ClipboardPlus,
   CalendarCheck,
   Settings,
-} from "lucide-react";
+} 
+from "lucide-react";
 
 const NavigationPage = () => {
-  const [openMenu, setOpenMenu] = useState("entity");
+  const [openMenu, setOpenMenu] = useState(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [hoveredItem, setHoveredItem] = useState(null);
   const navigate = useNavigate();
 
   const toggleMenu = (menu) => {
@@ -24,118 +26,609 @@ const NavigationPage = () => {
       label: "Entity",
       icon: <LayoutGrid size={20} />,
       items: [
-        { label: "Entity List", path: "/entitylist" },
-        { label: "Create Entity", path: "/entityform" },
-        { label: "Entity Data Table", path: "/entity-data" },
+        { label: "Entity List", path: "/entitylist", description: "View and manage all entities in the system" },
+        { label: "Create Entity", path: "/entityform", description: "Add a new entity to the database" },
+        { label: "Entity Data Table", path: "/entity-data", description: "Browse entity data in table format" },
+      ],
+    },
+    manager: {
+      label: "Source",
+      icon: <Settings size={20} />,
+      items: [
+        { label: "Source Manager", path: "/sourcemanagement", description: "Manage data sources and connections" },
+        { label: "Add New Source", path: "/addsource", description: "Configure a new data source" },
       ],
     },
     mapping: {
       label: "Mapping",
       icon: <ClipboardPlus size={20} />,
       items: [
-        { label: "Create Entity Mapping", path: "/entitymappingform" },
-        { label: "Entity Mapping List", path: "/mappingmanager" },
+        { label: "Create Entity Mapping", path: "/entitymappingform", description: "Define relationships between entities" },
+        { label: "Entity Mapping List", path: "/mappingmanager", description: "View all existing entity mappings" },
       ],
     },
     task: {
-      label: "Task",
+      label: "Scheduled",
       icon: <CalendarCheck size={20} />,
       items: [
-        { label: "Schedule a Task", path: "/taskscheduler" },
-        { label: "Task List", path: "/tasksmanagement" },
-        { label: "Task Executor", path: "/taskexecutor" },
+        { label: "Schedule a Task", path: "/taskscheduler", description: "Create and schedule new automated tasks" },
+        { label: "Task List", path: "/tasksmanagement", description: "View and manage all scheduled tasks" },
+        { label: "Task Executor", path: "/taskexecutor", description: "Execute tasks manually or view execution logs" },
       ],
     },
-    manager: {
-      label: "Source",
-      icon: <Settings size={20} />,
-      items: [{ label: "Source Manager", path: "/sourcemanagement" }],
+
+  };
+
+  const styles = {
+    container: {
+      minHeight: "100vh",
+      display: "flex",
+      backgroundColor: "#F1F6FB",
+      color: "#00364A",
+      fontFamily: "'Inter', sans-serif",
     },
+    sidebar: {
+      position: "fixed",
+      top: 0,
+      left: 0,
+      height: "100%",
+      backgroundColor: "#00364A",
+      color: "white",
+      boxShadow: "4px 0 20px rgba(0, 54, 74, 0.15)",
+      zIndex: 40,
+      transition: "all 0.3s ease-in-out",
+      width: sidebarOpen ? "280px" : "80px",
+      overflow: "hidden",
+    },
+    sidebarInner: {
+      padding: "24px 16px",
+      height: "100%",
+      display: "flex",
+      flexDirection: "column",
+    },
+    sidebarHeader: {
+      fontSize: "36px",
+      fontWeight: "900",
+      textAlign: "center",
+      marginBottom: "40px",
+      opacity: sidebarOpen ? 1 : 0,
+      transition: "opacity 0.3s ease",
+      letterSpacing: "4px",
+      fontFamily: "'Montserrat', 'Arial Black', sans-serif",
+      textTransform: "uppercase",
+      background: "linear-gradient(135deg, #ffffff 0%, #a9d2ff 100%)",
+      WebkitBackgroundClip: "text",
+      WebkitTextFillColor: "transparent",
+      backgroundClip: "text",
+    },
+    menuButton: (isActive) => ({
+      width: "100%",
+      display: "flex",
+      alignItems: "center",
+      padding: "14px 16px",
+      borderRadius: "12px",
+      fontSize: "16px",
+      fontWeight: "600",
+      border: "none",
+      cursor: "pointer",
+      transition: "all 0.2s ease",
+      backgroundColor: isActive ? "rgba(255, 255, 255, 0.15)" : "transparent",
+      color: "white",
+      marginBottom: "8px",
+      justifyContent: sidebarOpen ? "flex-start" : "center",
+    }),
+    menuButtonHover: {
+      backgroundColor: "rgba(255, 255, 255, 0.1)",
+    },
+    menuLabel: {
+      marginLeft: "16px",
+      flex: 1,
+      textAlign: "left",
+      display: sidebarOpen ? "block" : "none",
+    },
+    submenuContainer: (isOpen) => ({
+      maxHeight: isOpen ? "500px" : "0",
+      overflow: "hidden",
+      transition: "max-height 0.3s ease",
+      marginLeft: sidebarOpen ? "20px" : "0",
+      marginTop: "4px",
+    }),
+    submenuItem: {
+      width: "100%",
+      padding: "12px 16px",
+      backgroundColor: "transparent",
+      border: "none",
+      color: "white",
+      fontSize: "14px",
+      fontWeight: "500",
+      textAlign: "left",
+      cursor: "pointer",
+      borderRadius: "8px",
+      transition: "all 0.2s ease",
+      marginBottom: "4px",
+      display: sidebarOpen ? "block" : "none",
+    },
+
+    mainContent: {
+      flex: 1,
+      transition: "all 0.3s ease-in-out",
+      marginLeft: sidebarOpen ? "280px" : "80px",
+    },
+    header: {
+      width: "100%",
+      background: "linear-gradient(135deg, #00364A 0%, #004d66 100%)",
+      color: "white",
+      padding: "20px 32px",
+      boxShadow: "0 4px 12px rgba(0, 54, 74, 0.1)",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "space-between",
+    },
+    headerLeft: {
+      display: "flex",
+      alignItems: "center",
+      gap: "16px",
+    },
+    menuToggle: {
+      padding: "10px",
+      backgroundColor: "rgba(255, 255, 255, 0.15)",
+      border: "none",
+      borderRadius: "10px",
+      cursor: "pointer",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      color: "white",
+      transition: "all 0.2s ease",
+    },
+    headerTitle: {
+      fontSize: "28px",
+      fontWeight: "700",
+      color: "white",
+      letterSpacing: "0.5px",
+    },
+    main: {
+      padding: "40px",
+      minHeight: "600px",
+    },
+
+    contentCard: {
+      backgroundColor: "#E0EFFF",
+      padding: "32px",
+      borderRadius: "20px",
+      boxShadow: "0 8px 24px rgba(0, 54, 74, 0.08)",
+      border: "1px solid rgba(0, 54, 74, 0.1)",
+    },
+    contentTitle: {
+      fontSize: "24px",
+      fontWeight: "700",
+      marginBottom: "24px",
+      paddingBottom: "16px",
+      borderBottom: "2px solid rgba(0, 54, 74, 0.1)",
+      color: "#00364A",
+    },
+    descriptionSection: {
+      marginTop: "32px",
+      padding: "24px",
+      backgroundColor: "#F1F6FB",
+      borderRadius: "16px",
+      border: "2px solid rgba(0, 54, 74, 0.1)",
+      minHeight: "100px",
+      display: "flex",
+      flexDirection: "column",
+      gap: "8px",
+    },
+    descriptionTitle: {
+      fontSize: "16px",
+      fontWeight: "700",
+      color: "#00364A",
+      marginBottom: "8px",
+    },
+    descriptionText: {
+      fontSize: "14px",
+      fontWeight: "400",
+      color: "#00364A",
+      lineHeight: "1.6",
+    },
+    descriptionPlaceholder: {
+      fontSize: "14px",
+      fontWeight: "400",
+      color: "#00364A",
+      opacity: 0.5,
+      fontStyle: "italic",
+    },
+    gridContainer: {
+      display: "grid",
+      gridTemplateColumns: "repeat(auto-fill, minmax(250px, 1fr))",
+      gap: "20px",
+    },
+    gridItem: {
+      padding: "24px",
+      backgroundColor: "#E0EFFF",
+      border: "2px solid rgba(0, 54, 74, 0.15)",
+      borderRadius: "16px",
+      textAlign: "left",
+      fontWeight: "600",
+      fontSize: "15px",
+      color: "#00364A",
+      cursor: "pointer",
+      transition: "all 0.3s ease",
+      boxShadow: "0 4px 12px rgba(0, 54, 74, 0.05)",
+      position: "relative",
+      overflow: "hidden",
+    },
+    quickAccessTitle: {
+      fontSize: "42px",
+      fontWeight: "700",
+      marginBottom: "48px",
+      color: "#00364A",
+      letterSpacing: "0.3px",
+      textAlign: "center",
+    },
+    quickAccessGrid: {
+      display: "grid",
+      gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
+      gap: "24px",
+      maxWidth: "1200px",
+      margin: "0 auto",
+    },
+    quickAccessCard: {
+      padding: "24px",
+      backgroundColor: "white",
+      borderRadius: "16px",
+      boxShadow: "0 4px 20px rgba(0, 54, 74, 0.08)",
+      border: "2px solid #E0E0E0",
+      transition: "all 0.3s ease",
+      textAlign: "left",
+      display: "flex",
+      flexDirection: "column",
+      gap: "12px",
+      position: "relative",
+    },
+    quickAccessIconSmall: {
+      width: "48px",
+      height: "48px",
+      backgroundColor: "#5A7A8C",
+      borderRadius: "12px",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      color: "white",
+      position: "absolute",
+      top: "24px",
+      right: "24px",
+    },
+    stepLabel: {
+      fontSize: "24px",
+      fontWeight: "700",
+      color: "#1A1A1A",
+      margin: "0",
+      marginBottom: "8px",
+    },
+    quickAccessCardTitle: {
+      fontSize: "16px",
+      fontWeight: "600",
+      color: "#1A1A1A",
+      margin: "0",
+      marginBottom: "4px",
+    },
+    quickAccessCardText: {
+      fontSize: "13px",
+      fontWeight: "400",
+      color: "#6B7280",
+      margin: "0",
+      lineHeight: "1.5",
+      marginBottom: "8px",
+    },
+    actionButton: (color) => ({
+      padding: "12px 24px",
+      backgroundColor: color,
+      color: "white",
+      border: "2px solid " + color,
+      borderRadius: "8px",
+      fontSize: "14px",
+      fontWeight: "600",
+      cursor: "pointer",
+      transition: "all 0.3s ease",
+      marginTop: "auto",
+      alignSelf: "flex-start",
+    }),
   };
 
   return (
-    <div className="min-h-screen flex bg-gray-100 text-gray-800">
+    <div style={styles.container}>
       {/* Sidebar */}
-      <aside
-        className={`fixed top-0 left-0 h-full bg-teal-600 text-white shadow-2xl z-40 transition-all duration-300 ease-in-out ${
-          sidebarOpen ? "w-72" : "w-20"
-        }`}
-      >
-        <div className="p-4 h-full flex flex-col">
-          <h2
-            className={`text-2xl font-bold text-center text-white-400 mb-8 transition-opacity duration-300 ${
-              sidebarOpen ? "opacity-100" : "opacity-0"
-            }`}
-          >
-            Dashboard
-          </h2>
+      <aside style={styles.sidebar}>
+        <div style={styles.sidebarInner}>
+          <h2 style={styles.sidebarHeader}>SCOUT</h2>
 
           {Object.entries(menuContent).map(([key, { label, icon }]) => (
-            <div key={key} className="mb-2">
+            <div key={key}>
               <button
                 onClick={() => toggleMenu(key)}
-                className={`w-full flex items-center px-4 py-3 rounded-lg text-lg font-semibold transition-colors duration-200 ${
-                  openMenu === key
-                    ? "bg-teal-600 text-gray-600"
-                    : "hover:bg-gray-800 text-gray-600"
-                } ${!sidebarOpen && "justify-center"}`}
+                style={styles.menuButton(openMenu === key)}
+                onMouseEnter={(e) => {
+                  if (openMenu !== key) {
+                    e.currentTarget.style.backgroundColor =
+                      styles.menuButtonHover.backgroundColor;
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (openMenu !== key) {
+                    e.currentTarget.style.backgroundColor = "transparent";
+                  }
+                }}
               >
                 {icon}
-                {sidebarOpen && <span className="ml-4 text-gray-600 flex-1 text-left">{label}</span>}
-                {sidebarOpen && (openMenu === key ? <ChevronDown /> : <ChevronRight />)}
+                {sidebarOpen && <span style={styles.menuLabel}>{label}</span>}
+                {sidebarOpen &&
+                  (openMenu === key ? (
+                    <ChevronDown size={20} />
+                  ) : (
+                    <ChevronRight size={20} />
+                  ))}
               </button>
-            </div>
-          ))}
-        </div>
-      </aside>
 
-      {/* Main Content */}
-      <div
-        className={`flex-1 transition-all duration-300 ease-in-out ${
-          sidebarOpen ? "ml-72" : "ml-20"
-        }`}
-      >
-        {/* Header */}
-        <header className="w-full bg-teal-600 text-white py-4 px-6 shadow-md flex items-center justify-between">
-          <div className="flex items-center">
-            <button
-              onClick={() => setSidebarOpen(!sidebarOpen)}
-              className="mr-4 p-2 text-gray-600 rounded-full hover:bg-gray-200 transition-colors duration-200"
-            >
-              <Menu size={28} />
-            </button>
-            <h1 className="text-2xl font-bold text-white">Navigation</h1>
-          </div>
-        </header>
-
-        {/* Content Area */}
-        <main className="p-8">
-          {!openMenu && (
-            <div className="text-center p-10 bg-white rounded-lg shadow-md">
-              <h2 className="text-3xl font-semibold mb-3 text-gray-700">
-                Welcome to Your Dashboard
-              </h2>
-              <p className="text-gray-500">
-                Select a category from the sidebar to view available options.
-              </p>
-            </div>
-          )}
-
-          {openMenu && (
-            <div className="bg-white p-6 rounded-lg shadow-md">
-              <h2 className="text-2xl font-semibold mb-6 border-b pb-3 text-teal-700">
-                {menuContent[openMenu].label} Options
-              </h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {menuContent[openMenu].items.map((item, idx) => (
+              <div style={styles.submenuContainer(openMenu === key)}>
+                {menuContent[key].items.map((item, idx) => (
                   <button
                     key={idx}
                     onClick={() => navigate(item.path)}
-                    className="px-6 py-4 bg-gray-50 hover:bg-teal-100 border border-gray-200 rounded-lg text-left font-medium text-gray-700 hover:text-teal-800 transition-all duration-200 transform hover:scale-105 shadow-sm"
+                    style={styles.submenuItem}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor =
+                        "rgba(255, 255, 255, 0.1)";
+                      e.currentTarget.style.paddingLeft = "20px";
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = "transparent";
+                      e.currentTarget.style.paddingLeft = "16px";
+                    }}
                   >
                     {item.label}
                   </button>
                 ))}
+              </div>
+            </div>
+          ))}
+          
+        </div>
+      </aside>
+
+      {/* Main Content */}
+      <div style={styles.mainContent}>
+        {/* Header */}
+        <header style={styles.header}>
+          <div style={styles.headerLeft}>
+            <button
+              onClick={() => {
+                setSidebarOpen(!sidebarOpen);
+                if (sidebarOpen) {
+                  setOpenMenu(null);
+                }
+              }}
+              style={styles.menuToggle}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor =
+                  "rgba(255, 255, 255, 0.25)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor =
+                  "rgba(255, 255, 255, 0.15)";
+              }}
+            >
+              <Menu size={24} />
+            </button>
+            <h1 style={styles.headerTitle}>Navigation Dashboard</h1>
+          </div>
+        </header>
+
+        {/* Content Area */}
+        <main style={styles.main}>
+          {!openMenu && (
+            <div>
+              <h2 style={styles.quickAccessTitle}>Quick Access</h2>
+              <div style={styles.quickAccessGrid}>
+                <div
+                  style={styles.quickAccessCard}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.boxShadow = "0 8px 32px rgba(90, 122, 140, 0.25)";
+                    e.currentTarget.style.borderColor = "#5A7A8C";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.boxShadow = "0 4px 20px rgba(0, 54, 74, 0.08)";
+                    e.currentTarget.style.borderColor = "#E0E0E0";
+                  }}
+                >
+                  <div style={styles.quickAccessIconSmall}>
+                    <LayoutGrid size={24} strokeWidth={2} />
+                  </div>
+                  <h2 style={styles.stepLabel}>Step 1</h2>
+                  <h3 style={styles.quickAccessCardTitle}>Create an Entity</h3>
+                  <p style={styles.quickAccessCardText}>
+                    Add a new entity to the database
+                  </p>
+                  <button
+                    style={styles.actionButton("#2C5F6F")}
+                    onClick={() => navigate("/entityform")}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = "white";
+                      e.currentTarget.style.color = "#2C5F6F";
+                      e.currentTarget.style.border = "2px solid #2C5F6F";
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = "#2C5F6F";
+                      e.currentTarget.style.color = "white";
+                      e.currentTarget.style.border = "2px solid #2C5F6F";
+                    }}
+                  >
+                    Create Entity
+                  </button>
+                </div>
+
+                <div
+                  style={styles.quickAccessCard}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.boxShadow = "0 8px 32px rgba(90, 122, 140, 0.25)";
+                    e.currentTarget.style.borderColor = "#5A7A8C";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.boxShadow = "0 4px 20px rgba(0, 54, 74, 0.08)";
+                    e.currentTarget.style.borderColor = "#E0E0E0";
+                  }}
+                >
+                  <div style={styles.quickAccessIconSmall}>
+                    <Settings size={24} strokeWidth={2} />
+                  </div>
+                  <h2 style={styles.stepLabel}>Step 2</h2>
+                  <h3 style={styles.quickAccessCardTitle}>Add New Source</h3>
+                  <p style={styles.quickAccessCardText}>
+                    Use the Source Manager to register and manage data sources
+                  </p>
+                  <button
+                    style={styles.actionButton("#2C5F6F")}
+                    onClick={() => navigate("/addsource")}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = "white";
+                      e.currentTarget.style.color = "#2C5F6F";
+                      e.currentTarget.style.border = "2px solid #2C5F6F";
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = "#2C5F6F";
+                      e.currentTarget.style.color = "white";
+                      e.currentTarget.style.border = "2px solid #2C5F6F";
+                    }}
+                  >
+                    Add Source
+                  </button>
+                </div>
+
+                <div
+                  style={styles.quickAccessCard}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.boxShadow = "0 8px 32px rgba(90, 122, 140, 0.25)";
+                    e.currentTarget.style.borderColor = "#5A7A8C";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.boxShadow = "0 4px 20px rgba(0, 54, 74, 0.08)";
+                    e.currentTarget.style.borderColor = "#E0E0E0";
+                  }}
+                >
+                  <div style={styles.quickAccessIconSmall}>
+                    <ClipboardPlus size={24} strokeWidth={2} />
+                  </div>
+                  <h2 style={styles.stepLabel}>Step 3</h2>
+                  <h3 style={styles.quickAccessCardTitle}>Entity Mapping</h3>
+                  <p style={styles.quickAccessCardText}>
+                    Review existing mappings and create a new, configured mapping in the Mapping module if none is available.
+
+                  </p>
+                  <button
+                    style={styles.actionButton("#2C5F6F")}
+                    onClick={() => navigate("/entitymappingform")}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = "white";
+                      e.currentTarget.style.color = "#2C5F6F";
+                      e.currentTarget.style.border = "2px solid #2C5F6F";
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = "#2C5F6F";
+                      e.currentTarget.style.color = "white";
+                      e.currentTarget.style.border = "2px solid #2C5F6F";
+                    }}
+                  >
+                    Create Mapping
+                  </button>
+                </div>
+
+                <div
+                  style={styles.quickAccessCard}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.boxShadow = "0 8px 32px rgba(90, 122, 140, 0.25)";
+                    e.currentTarget.style.borderColor = "#5A7A8C";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.boxShadow = "0 4px 20px rgba(0, 54, 74, 0.08)";
+                    e.currentTarget.style.borderColor = "#E0E0E0";
+                  }}
+                >
+                  <div style={styles.quickAccessIconSmall}>
+                    <CalendarCheck size={24} strokeWidth={2} />
+                  </div>
+                  <h2 style={styles.stepLabel}>Step 4</h2>
+                  <h3 style={styles.quickAccessCardTitle}>Schedule a Task</h3>
+                  <p style={styles.quickAccessCardText}>
+                    Create and schedule new automated tasks
+                  </p>
+                  <button
+                    style={styles.actionButton("#2C5F6F")}
+                    onClick={() => navigate("/taskscheduler")}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = "white";
+                      e.currentTarget.style.color = "#2C5F6F";
+                      e.currentTarget.style.border = "2px solid #2C5F6F";
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = "#2C5F6F";
+                      e.currentTarget.style.color = "white";
+                      e.currentTarget.style.border = "2px solid #2C5F6F";
+                    }}
+                  >
+                    Schedule Task
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {openMenu && (
+            <div style={styles.contentCard}>
+              <h2 style={styles.contentTitle}>
+                {menuContent[openMenu].label} Options
+              </h2>
+              <div style={styles.gridContainer}>
+                {menuContent[openMenu].items.map((item, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => navigate(item.path)}
+                    style={styles.gridItem}
+                    onMouseEnter={(e) => {
+                      setHoveredItem(item);
+                      e.currentTarget.style.backgroundColor = "#A9D2FF";
+                      e.currentTarget.style.transform =
+                        "translateY(-4px) scale(1.02)";
+                      e.currentTarget.style.boxShadow =
+                        "0 8px 20px rgba(0, 54, 74, 0.15)";
+                      e.currentTarget.style.borderColor = "#00364A";
+                    }}
+                    onMouseLeave={(e) => {
+                      setHoveredItem(null);
+                      e.currentTarget.style.backgroundColor = "#E0EFFF";
+                      e.currentTarget.style.transform =
+                        "translateY(0) scale(1)";
+                      e.currentTarget.style.boxShadow =
+                        "0 4px 12px rgba(0, 54, 74, 0.05)";
+                      e.currentTarget.style.borderColor =
+                        "rgba(0, 54, 74, 0.15)";
+                    }}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Description Section */}
+              <div style={styles.descriptionSection}>
+                <div style={styles.descriptionTitle}>Description</div>
+                {hoveredItem ? (
+                  <div style={styles.descriptionText}>
+                    {hoveredItem.description}
+                  </div>
+                ) : (
+                  <div style={styles.descriptionPlaceholder}>
+                    Hover over an option to see its description
+                  </div>
+                )}
               </div>
             </div>
           )}
