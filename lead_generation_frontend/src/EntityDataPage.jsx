@@ -1,62 +1,376 @@
 import React, { useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Database, ChevronLeft, ChevronRight, Loader2, AlertTriangle, List, ArrowLeft } from "lucide-react";
+import { Database, ChevronLeft, ChevronRight, Loader2, AlertTriangle, List, ArrowLeft, Download, FileText, Menu, ChevronDown, ChevronRight as ChevronRightIcon, LayoutGrid, ClipboardPlus, CalendarCheck, Settings } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 import API_BASE from "./api_base";
 import { useNavigate } from "react-router-dom";
+
+// Helper: Fetch all entity data (across all pages)
+const fetchAllEntityData = async (entityName) => {
+  let allRows = [];
+  let page = 1;
+  let hasMore = true;
+  const pageSize = 100;
+
+  while (hasMore) {
+    const res = await fetch(
+      `${API_BASE}/entity/entity-data/${entityName}?page=${page}&page_size=${pageSize}`,
+      {
+        method: "GET",
+        headers: {
+          "ngrok-skip-browser-warning": "true"
+        }
+      }
+    );
+
+    if (!res.ok) throw new Error("Failed to fetch data");
+    const json = await res.json();
+    
+    if (json.rows && json.rows.length > 0) {
+      allRows = [...allRows, ...json.rows];
+      hasMore = json.rows.length === pageSize;
+      page++;
+    } else {
+      hasMore = false;
+    }
+  }
+
+  return allRows;
+};
+
+// Helper: Export data as CSV
+const exportToCSV = (columns, rows, entityName) => {
+  const header = columns.map(col => `"${col}"`).join(",");
+  
+  const csvRows = rows.map(row => {
+    return row.map(cell => {
+      const value = cell === null || cell === undefined ? "" : String(cell);
+      return `"${value.replace(/"/g, '""')}"`;
+    }).join(",");
+  });
+
+  const csv = [header, ...csvRows].join("\n");
+  
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const link = document.createElement("a");
+  link.setAttribute("href", URL.createObjectURL(blob));
+  link.setAttribute("download", `${entityName}_export_${new Date().toISOString().split('T')[0]}.csv`);
+  link.click();
+};
+
+// Helper: Export data as Excel
+const exportToExcel = (columns, rows, entityName) => {
+  const header = columns.join("\t");
+  const excelRows = rows.map(row => 
+    row.map(cell => {
+      const value = cell === null || cell === undefined ? "" : String(cell);
+      return value.replace(/\t/g, " ").replace(/\n/g, " ");
+    }).join("\t")
+  );
+
+  const tsv = [header, ...excelRows].join("\n");
+  
+  const blob = new Blob([tsv], { type: "application/vnd.ms-excel;charset=utf-8;" });
+  const link = document.createElement("a");
+  link.setAttribute("href", URL.createObjectURL(blob));
+  link.setAttribute("download", `${entityName}_export_${new Date().toISOString().split('T')[0]}.xls`);
+  link.click();
+};
+
+// Tooltip Component for long text
+const TextWithTooltip = ({ text, maxLength = 50 }) => {
+  const [showTooltip, setShowTooltip] = useState(false);
+  const displayText = text && String(text).length > maxLength 
+    ? String(text).substring(0, maxLength) + "..." 
+    : text;
+  const needsTooltip = text && String(text).length > maxLength;
+
+  if (!needsTooltip) {
+    return <span>{text}</span>;
+  }
+
+  return (
+    <div 
+      style={{ position: 'relative', display: 'inline-block' }}
+      onMouseEnter={() => setShowTooltip(true)}
+      onMouseLeave={() => setShowTooltip(false)}
+    >
+      <span style={{ cursor: 'help' }}>{displayText}</span>
+      {showTooltip && (
+        <div style={{
+          position: 'absolute',
+          bottom: '100%',
+          left: '0',
+          marginBottom: '8px',
+          padding: '12px',
+          backgroundColor: '#00364A',
+          color: 'white',
+          borderRadius: '8px',
+          fontSize: '13px',
+          maxWidth: '400px',
+          wordWrap: 'break-word',
+          zIndex: 1000,
+          boxShadow: '0 4px 12px rgba(0, 54, 74, 0.3)',
+          whiteSpace: 'normal'
+        }}>
+          {text}
+          <div style={{
+            position: 'absolute',
+            top: '100%',
+            left: '20px',
+            width: 0,
+            height: 0,
+            borderLeft: '6px solid transparent',
+            borderRight: '6px solid transparent',
+            borderTop: '6px solid #00364A'
+          }} />
+        </div>
+      )}
+    </div>
+  );
+};
+
 const EntityDataScreen = () => {
   const [searchParams] = useSearchParams();
-  const [entities, setEntities] = useState([]);
   const [selectedEntity, setSelectedEntity] = useState(null);
-  const [data, setData] = useState(null);
   const [page, setPage] = useState(1);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-  const [pageSize] = useState(10);  // or make it adjustable
+  const [pageSize] = useState(10);
+  const [exportingCSV, setExportingCSV] = useState(false);
+  const [exportingExcel, setExportingExcel] = useState(false); 
+  const [isNavigatingPage, setIsNavigatingPage] = useState(false);
+  const [navigatingDirection, setNavigatingDirection] = useState(null);
+  const [openMenu, setOpenMenu] = useState(null);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
   const navigate = useNavigate();
-  // Get entity from query parameter if provided
   const entityFromParam = searchParams.get('entity');
 
-  useEffect(() => {
-    fetchEntities();
-  }, []);
+  const toggleMenu = (menu) => {
+    setOpenMenu(openMenu === menu ? null : menu);
+  };
 
-  // Auto-select entity from URL parameter when entities load
-  useEffect(() => {
-    if (entityFromParam && entities.length > 0 && !selectedEntity) {
-      const matchingEntity = entities.find(e => e.name === entityFromParam);
-      if (matchingEntity) {
-        setSelectedEntity(entityFromParam);
-      }
-    }
-  }, [entityFromParam, entities, selectedEntity]);
+  const menuContent = {
+    entity: {
+      label: "Entities",
+      icon: <LayoutGrid size={20} />,
+      items: [
+        { label: "Entity List", path: "/entitylist" },
+        { label: "Create Entity", path: "/entityform" },
+        { label: "Entity Data Table", path: "/entity-data" },
+      ],
+    },
+    manager: {
+      label: "Sources",
+      icon: <Settings size={20} />,
+      items: [
+        { label: "Source Manager", path: "/sourcemanagement" },
+        { label: "Add Source", path: "/addsource" },
+      ],
+    },
+    mapping: {
+      label: "Mappings",
+      icon: <ClipboardPlus size={20} />,
+      items: [
+        { label: "Entity Mapping List", path: "/mappingmanager" },
+        { label: "Create Entity Mapping", path: "/entitymappingform" },
+      ],
+    },
+    task: {
+      label: "Tasks",
+      icon: <CalendarCheck size={20} />,
+      items: [
+        { label: "Schedule a Task", path: "/taskscheduler" },
+        { label: "Task List", path: "/tasksmanagement" },
+        { label: "Task Executor", path: "/taskexecutor" },
+      ],
+    },
+  };
 
-  useEffect(() => {
-    if (selectedEntity) {
-      fetchEntityData(selectedEntity, page);
-    }
-  }, [selectedEntity, page]);
+  const sidebarStyles = {
+    container: {
+      minHeight: "100vh",
+      display: "flex",
+      backgroundColor: "#C7D8ED", // background
+      color: "#00364A",
+      fontFamily: "'Inter', sans-serif",
+    },
 
-  const fetchEntities = async () => {
-    try {
+    sidebar: {
+      position: "fixed",
+      top: 0,
+      left: 0,
+      height: "100%",
+      backgroundColor: "#00364A", // primary
+      color: "#FFFFFF",
+      boxShadow: "0 0 20px rgba(0, 54, 74, 0.15)", // shadowLight
+      zIndex: 40,
+      transition: "all 0.3s ease-in-out",
+      width: sidebarOpen ? "280px" : "80px",
+      overflow: "hidden",
+    },
+
+    sidebarInner: {
+      padding: "24px 16px",
+      height: "100%",
+      display: "flex",
+      flexDirection: "column",
+    },
+
+    sidebarHeader: {
+      fontSize: "36px",
+      fontWeight: "900",
+      textAlign: "center",
+      marginBottom: "40px",
+      opacity: sidebarOpen ? 1 : 0,
+      transition: "opacity 0.3s ease",
+      letterSpacing: "4px",
+      fontFamily: "'Montserrat', 'Arial Black', sans-serif",
+      textTransform: "uppercase",
+      background: "linear-gradient(135deg, #ffffff 0%, #49A3C4 100%)", // accent
+      WebkitBackgroundClip: "text",
+      WebkitTextFillColor: "transparent",
+      backgroundClip: "text",
+    },
+
+    menuButton: (isActive) => ({
+      width: "100%",
+      display: "flex",
+      alignItems: "center",
+      padding: "14px 16px",
+      borderRadius: "12px",
+      fontSize: "16px",
+      fontWeight: "600",
+      border: "none",
+      cursor: "pointer",
+      transition: "all 0.2s ease",
+      backgroundColor: isActive
+        ? "rgba(73, 163, 196, 0.25)" // accent
+        : "transparent",
+      color: "#FFFFFF",
+      marginBottom: "8px",
+      justifyContent: sidebarOpen ? "flex-start" : "center",
+    }),
+
+    menuButtonHover: {
+      backgroundColor: "rgba(73, 163, 196, 0.15)", // accent
+    },
+
+    menuLabel: {
+      marginLeft: "16px",
+      flex: 1,
+      textAlign: "left",
+      display: sidebarOpen ? "block" : "none",
+    },
+
+    submenuContainer: (isOpen) => ({
+      maxHeight: isOpen ? "500px" : "0",
+      overflow: "hidden",
+      transition: "max-height 0.3s ease",
+      marginLeft: sidebarOpen ? "20px" : "0",
+      marginTop: "4px",
+    }),
+
+    submenuItem: {
+      width: "100%",
+      padding: "12px 16px",
+      backgroundColor: "transparent",
+      border: "none",
+      color: "#FFFFFF",
+      fontSize: "14px",
+      fontWeight: "500",
+      textAlign: "left",
+      cursor: "pointer",
+      borderRadius: "8px",
+      transition: "all 0.2s ease",
+      marginBottom: "4px",
+      display: sidebarOpen ? "block" : "none",
+    },
+
+    mainContent: {
+      flex: 1,
+      transition: "all 0.3s ease-in-out",
+      marginLeft: sidebarOpen ? "280px" : "80px",
+      minHeight: "100vh",
+      backgroundColor: "#C7D8ED", // background
+      display: "flex",
+      flexDirection: "column",
+    },
+
+    header: {
+      width: "100%",
+      background: "#00364A", // primary
+      color: "#FFFFFF",
+      padding: "20px 32px",
+      boxShadow: "0 4px 12px rgba(0, 54, 74, 0.15)", // shadowLight
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "space-between",
+    },
+
+    headerLeft: {
+      display: "flex",
+      alignItems: "center",
+      gap: "16px",
+    },
+
+    menuToggle: {
+      padding: "10px",
+      backgroundColor: "rgba(73, 163, 196, 0.2)", // accent
+      border: "none",
+      borderRadius: "10px",
+      cursor: "pointer",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      color: "#FFFFFF",
+      transition: "all 0.2s ease",
+    },
+
+    headerTitle: {
+      fontSize: "28px",
+      fontWeight: "700",
+      color: "#FFFFFF",
+      letterSpacing: "0.5px",
+    },
+
+    main: {
+      padding: "40px",
+      flex: 1,
+      width: "100%",
+    },
+  };
+  // Fetch entities list
+  const { data: entitiesData } = useQuery({
+    queryKey: ['entities'],
+    queryFn: async () => {
       const res = await fetch(`${API_BASE}/entity/entities`,{
         method: "GET",
         headers: {
           "ngrok-skip-browser-warning": "true"
         }
       });
+      if (!res.ok) throw new Error("Failed to load entities");
       const json = await res.json();
-      setEntities(json.entities || []);
-    } catch (err) {
-      setError("Failed to load entities.");
-    }
-  };
+      return json.entities || [];
+    },
+  });
 
-  const fetchEntityData = async (entityName, pageNum) => {
-    setLoading(true);
-    setError(null);
-    try {
+  // Auto-select entity from URL parameter when entities load
+  useEffect(() => {
+    if (entityFromParam && entitiesData && entitiesData.length > 0 && !selectedEntity) {
+      const matchingEntity = entitiesData.find(e => e.name === entityFromParam);
+      if (matchingEntity) {
+        setSelectedEntity(entityFromParam);
+      }
+    }
+  }, [entityFromParam, entitiesData, selectedEntity]);
+
+  // Fetch entity data
+  const { data, isLoading: isLoadingData, isFetching: isFetchingData, error: queryError } = useQuery({
+    queryKey: ['entity-data', selectedEntity, page, pageSize],
+    queryFn: async () => {
+      if (!selectedEntity) return null;
       const res = await fetch(
-        `${API_BASE}/entity/entity-data/${entityName}?page=${pageNum}&page_size=${pageSize}`,
+        `${API_BASE}/entity/entity-data/${selectedEntity}?page=${page}&page_size=${pageSize}`,
         {
           method: "GET",
           headers: {
@@ -67,113 +381,179 @@ const EntityDataScreen = () => {
 
       if (!res.ok) throw new Error("Failed to fetch data");
       const json = await res.json();
-      setData(json);
+      return json;
+    },
+    enabled: !!selectedEntity,
+  });
+
+  // CHANGE THIS - Reset navigation direction when data fetching completes
+  useEffect(() => {
+    if (!isFetchingData) {
+      setNavigatingDirection(null);
+    }
+  }, [isFetchingData]);
+
+  const loading = isLoadingData && !data;
+  const error = queryError?.message || null;
+  const entities = entitiesData || [];
+
+  // CHANGE THESE - Page navigation handlers
+  const handlePreviousPage = () => {
+    if (page > 1) {
+      setNavigatingDirection('prev');
+      setPage((p) => p - 1);
+    }
+  };
+
+  const handleNextPage = () => {
+    if (data?.rows?.length === pageSize) {
+      setNavigatingDirection('next');
+      setPage((p) => p + 1);
+    }
+  };
+
+  // Filter out modified_at column
+  const filteredColumns = data?.columns?.filter(col => col !== 'modified_at') || [];
+  const modifiedAtIndex = data?.columns?.indexOf('modified_at');
+  const filteredRows = data?.rows?.map(row => {
+    if (modifiedAtIndex !== -1) {
+      return row.filter((_, idx) => idx !== modifiedAtIndex);
+    }
+    return row;
+  }) || [];
+
+  // Export handler for CSV
+  const handleExportCSV = async () => {
+    if (!selectedEntity || !data) return;
+    
+    try {
+      setExportingCSV(true);
+      const allRows = await fetchAllEntityData(selectedEntity);
+      exportToCSV(data.columns, allRows, selectedEntity);
     } catch (err) {
-      setError(err.message);
-      setData(null);
+      alert(`Export failed: ${err.message}`);
     } finally {
-      setLoading(false);
+      setExportingCSV(false);
+    }
+  };
+
+  // Export handler for Excel
+  const handleExportExcel = async () => {
+    if (!selectedEntity || !data) return;
+    
+    try {
+      setExportingExcel(true);
+      const allRows = await fetchAllEntityData(selectedEntity);
+      exportToExcel(data.columns, allRows, selectedEntity);
+    } catch (err) {
+      alert(`Export failed: ${err.message}`);
+    } finally {
+      setExportingExcel(false);
     }
   };
 
   return (
-    <div style={{
-      minHeight: '100vh',
-      backgroundColor: '#C7D8ED',
-      color: '#00364A',
-      fontFamily: "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif",
-      padding: '40px 20px',
-      display: 'flex',
-      justifyContent: 'center',
-      alignItems: 'flex-start'
-    }}>
+    <div style={sidebarStyles.container}>
+      {/* Sidebar */}
+      <aside style={sidebarStyles.sidebar}>
+        <div style={sidebarStyles.sidebarInner}>
+          <h2 
+            style={sidebarStyles.sidebarHeader}
+            onClick={() => navigate('/dashboard')}
+            title="Go to Dashboard"
+          >
+            SCOUT
+          </h2>
+
+          {Object.entries(menuContent).map(([key, { label, icon }]) => (
+            <div key={key}>
+              <button
+                onClick={() => toggleMenu(key)}
+                style={sidebarStyles.menuButton(openMenu === key)}
+                onMouseEnter={(e) => {
+                  if (openMenu !== key) {
+                    e.currentTarget.style.backgroundColor =
+                      sidebarStyles.menuButtonHover.backgroundColor;
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (openMenu !== key) {
+                    e.currentTarget.style.backgroundColor = "transparent";
+                  }
+                }}
+              >
+                {icon}
+                {sidebarOpen && <span style={sidebarStyles.menuLabel}>{label}</span>}
+                {sidebarOpen &&
+                  (openMenu === key ? (
+                    <ChevronDown size={20} />
+                  ) : (
+                    <ChevronRightIcon size={20} />
+                  ))}
+              </button>
+
+              <div style={sidebarStyles.submenuContainer(openMenu === key)}>
+                {menuContent[key].items.map((item, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => navigate(item.path)}
+                    style={sidebarStyles.submenuItem}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor =
+                        "rgba(255, 255, 255, 0.1)";
+                      e.currentTarget.style.paddingLeft = "20px";
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = "transparent";
+                      e.currentTarget.style.paddingLeft = "16px";
+                    }}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      </aside>
+
+      {/* Main Content */}
+      <div style={sidebarStyles.mainContent}>
+        {/* Header */}
+        <header style={sidebarStyles.header}>
+          <div style={sidebarStyles.headerLeft}>
+            <button
+              onClick={() => {
+                setSidebarOpen(!sidebarOpen);
+                if (sidebarOpen) {
+                  setOpenMenu(null);
+                }
+              }}
+              style={sidebarStyles.menuToggle}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor =
+                  "rgba(255, 255, 255, 0.25)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor =
+                  "rgba(255, 255, 255, 0.15)";
+              }}
+            >
+              <Menu size={24} />
+            </button>
+            <h1 style={sidebarStyles.headerTitle}>Entity Data Viewer</h1>
+          </div>
+        </header>
+
+        {/* Content Area */}
+      <main style={sidebarStyles.main}>
       <div style={{
         width: '100%',
-        maxWidth: '1200px',
         backgroundColor: 'white',
         borderRadius: '25px',
         boxShadow: '0 15px 50px rgba(0, 54, 74, 0.15)',
         overflow: 'hidden'
       }}>
-        {/* Header */}
-        <div style={{
-          padding: '40px 50px',
-          borderBottom: '1px solid rgba(0, 54, 74, 0.1)',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          flexWrap: 'wrap',
-          gap: '20px'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-            <div style={{
-              width: '56px',
-              height: '56px',
-              backgroundColor: '#49A3C4',
-              borderRadius: '15px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: 'white'
-            }}>
-              <Database size={28} />
-            </div>
-            <div>
-              <h1 style={{
-                fontSize: '32px',
-                fontWeight: '800',
-                color: '#00364A',
-                margin: 0,
-                lineHeight: '1.2'
-              }}>Entity Data Viewer</h1>
-              <p style={{
-                fontSize: '16px',
-                color: '#00364A',
-                opacity: 0.7,
-                margin: '5px 0 0 0'
-              }}>Browse and inspect your database entities</p>
-            </div>
-            
-          </div>
-           <div
-          style={{
-          padding: '10px 10px',
-          display: 'flex',
-          justifyContent: 'right',
-          alignItems: 'center',
-          flexWrap: 'wrap',
-          gap: '20px'
-        }}>
-          <button
-             style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              padding: '12px 24px',
-              backgroundColor: 'white',
-              color: '#00364A',
-              borderRadius: '12px',
-              border: '2px solid #00364A',
-              fontWeight: '600',
-              cursor: 'pointer',
-              transition: 'all 0.3s'
-            }}
-            onMouseEnter={(e) => {
-              e.target.style.backgroundColor = '#00364A';
-              e.target.style.color = 'white';
-            }}
-            onMouseLeave={(e) => {
-              e.target.style.backgroundColor = 'white';
-              e.target.style.color = '#00364A';
-            }}
-            onClick={() => navigate('/dashboard')}
-          >
-          <ArrowLeft size={18} />
-            Dashboard
-            </button>
-            </div>
-        </div>
-
         <div style={{ padding: '50px' }}>
           {/* Entity Selector */}
           <div style={{ marginBottom: '30px', maxWidth: '400px' }}>
@@ -209,7 +589,7 @@ const EntityDataScreen = () => {
                 }}
               >
                 <option value="">-- Choose an entity --</option>
-                {entities.map((ent, idx) => (
+                {(entities || []).map((ent, idx) => (
                   <option key={idx} value={ent.name}>
                     {ent.name}
                   </option>
@@ -237,7 +617,7 @@ const EntityDataScreen = () => {
           )}
 
           {/* Loading */}
-          {loading && (
+          {(loading || (isFetchingData && page > 1)) && (
             <div style={{
               display: 'flex',
               justifyContent: 'center',
@@ -246,12 +626,14 @@ const EntityDataScreen = () => {
               color: '#00364A'
             }}>
               <Loader2 size={32} className="spin" style={{ marginRight: '10px' }} />
-              <span style={{ fontSize: '18px', fontWeight: '600' }}>Loading data...</span>
+              <span style={{ fontSize: '18px', fontWeight: '600' }}>
+                {isNavigatingPage ? 'Loading page...' : 'Loading data...'}
+              </span>
             </div>
           )}
 
           {/* No Data */}
-          {!loading && data && data.rows && data.rows.length === 0 && (
+          {!loading && !isFetchingData && data && filteredRows && filteredRows.length === 0 && (
             <div style={{
               textAlign: 'center',
               padding: '60px',
@@ -261,22 +643,24 @@ const EntityDataScreen = () => {
             }}>
               <List size={48} style={{ color: '#49A3C4', marginBottom: '15px', opacity: 0.5 }} />
               <h3 style={{ fontSize: '20px', fontWeight: '700', color: '#00364A', marginBottom: '5px' }}>No Data Found</h3>
-              <p style={{ color: '#00364A', opacity: 0.6 }}>This table has no records to display.</p>
+              <p style={{ color: '#00364A', opacity: 0.6 }}></p>
             </div>
           )}
 
           {/* Data Table */}
-          {!loading && data && data.rows && data.rows.length > 0 && (
+          {!loading && data && filteredRows && filteredRows.length > 0 && (
             <div style={{
               overflowX: 'auto',
               borderRadius: '15px',
               border: '1px solid rgba(0, 54, 74, 0.1)',
-              boxShadow: '0 4px 15px rgba(0, 54, 74, 0.05)'
+              boxShadow: '0 4px 15px rgba(0, 54, 74, 0.05)',
+              opacity: isFetchingData ? 0.6 : 1,
+              transition: 'opacity 0.3s ease'
             }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', backgroundColor: 'white' }}>
                 <thead style={{ backgroundColor: '#F8FBFF' }}>
                   <tr>
-                    {data.columns.map((col, idx) => (
+                    {filteredColumns.map((col, idx) => (
                       <th key={idx} style={{
                         padding: '16px 20px',
                         textAlign: 'left',
@@ -293,29 +677,22 @@ const EntityDataScreen = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {data.rows.map((row, ridx) => (
+                  {filteredRows.map((row, ridx) => (
                     <tr key={ridx} style={{ 
                       backgroundColor: ridx % 2 === 0 ? 'white' : '#FAFAFA',
                       transition: 'background-color 0.2s'
                     }}>
-                      {row.map((cell, cidx) => {
-                        const colName = data.columns[cidx];
-                        const displayValue = colName === 'modified_at' && cell
-                            ? new Date(cell).toLocaleString()
-                            : cell;
-
-                        return (
-                          <td key={cidx} style={{
-                            padding: '16px 20px',
-                            fontSize: '14px',
-                            color: '#00364A',
-                            borderBottom: '1px solid rgba(0, 54, 74, 0.05)',
-                            whiteSpace: 'nowrap'
-                          }}>
-                            {displayValue}
-                          </td>
-                        );
-                      })}
+                      {row.map((cell, cidx) => (
+                        <td key={cidx} style={{
+                          padding: '16px 20px',
+                          fontSize: '14px',
+                          color: '#00364A',
+                          borderBottom: '1px solid rgba(0, 54, 74, 0.05)',
+                          whiteSpace: 'nowrap'
+                        }}>
+                          <TextWithTooltip text={cell} maxLength={50} />
+                        </td>
+                      ))}
                     </tr>
                   ))}
                 </tbody>
@@ -324,38 +701,79 @@ const EntityDataScreen = () => {
           )}
 
           {/* Pagination */}
-          {data && data.rows && (
+          {data && filteredRows && (
             <div style={{
               display: 'flex',
               justifyContent: 'space-between',
               alignItems: 'center',
               marginTop: '30px',
               paddingTop: '20px',
-              borderTop: '1px solid rgba(0, 54, 74, 0.1)'
+              borderTop: '1px solid rgba(0, 54, 74, 0.1)',
+              flexWrap: 'wrap',
+              gap: '20px'
             }}>
-              <StyledButton
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                disabled={page === 1}
-                icon={<ChevronLeft size={18} />}
-              >
-                Previous
-              </StyledButton>
-              
-              <span style={{ fontSize: '14px', fontWeight: '600', color: '#00364A' }}>
-                Page {page}
-              </span>
-              
-              <StyledButton
-                onClick={() => setPage((p) => p + 1)}
-                disabled={data.rows.length < pageSize}
-                icon={<ChevronRight size={18} />}
-                iconPos="right"
-              >
-                Next
-              </StyledButton>
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <StyledButton
+                  onClick={handlePreviousPage}
+                  disabled={page === 1 || isFetchingData}
+                  icon={navigatingDirection === 'prev' ? <Loader2 size={18} className="spin" /> : <ChevronLeft size={18} />}
+                >
+                  Previous
+                </StyledButton>
+
+                <span style={{
+                  fontSize: '14px',
+                  fontWeight: '600',
+                  color: '#00364A',
+                  alignSelf: 'center',
+                  padding: '0 15px'
+                }}>
+                  Page {page}
+                </span>
+
+                <StyledButton
+                  onClick={handleNextPage}
+                  disabled={data.rows.length < pageSize || isFetchingData}
+                  icon={navigatingDirection === 'next' ? <Loader2 size={18} className="spin" /> : <ChevronRight size={18} />}
+                  iconPos="right"
+                >
+                  Next
+                </StyledButton>
+              </div>
+              {/* Export and Enrich Buttons */}
+              {filteredRows.length > 0 && (
+                <div style={{ display: 'flex', gap: '10px' }}>
+                  <ExportButton
+                    onClick={() => navigate('/enrichment', { state: { selectedEntity } })}
+                    disabled={isFetchingData}
+                    icon={<Database size={18} />}
+                    title="Enrich Entity Data"
+                  >
+                    Enrich
+                  </ExportButton>
+                  <ExportButton
+                    onClick={handleExportCSV}
+                    disabled={exportingCSV || isFetchingData}
+                    icon={exportingCSV ? <Loader2 size={18} className="spin" /> : <Download size={18} />}
+                    title="Export All as CSV"
+                  >
+                    {exportingCSV ? 'Exporting...' : 'CSV'}
+                  </ExportButton>
+                  <ExportButton
+                    onClick={handleExportExcel}
+                    disabled={exportingExcel || isFetchingData}
+                    icon={exportingExcel ? <Loader2 size={18} className="spin" /> : <FileText size={18} />}
+                    title="Export All as Excel"
+                  >
+                    {exportingExcel ? 'Exporting...' : 'Excel'}
+                  </ExportButton>
+                </div>
+              )}
             </div>
           )}
         </div>
+      </div>
+        </main>
       </div>
       <style>{`
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
@@ -364,7 +782,6 @@ const EntityDataScreen = () => {
     </div>
   );
 };
-
 // Helper Component for Buttons
 const StyledButton = ({ onClick, disabled, icon, children, iconPos = "left" }) => {
   const [hover, setHover] = useState(false);
@@ -389,6 +806,39 @@ const StyledButton = ({ onClick, disabled, icon, children, iconPos = "left" }) =
         cursor: disabled ? 'not-allowed' : 'pointer',
         transition: 'all 0.3s',
         flexDirection: iconPos === 'right' ? 'row-reverse' : 'row'
+      }}
+    >
+      {icon}
+      {children}
+    </button>
+  );
+};
+
+// Export Button Component
+const ExportButton = ({ onClick, disabled, icon, children, title }) => {
+  const [hover, setHover] = useState(false);
+  
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      title={title}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: '8px',
+        padding: '10px 16px',
+        backgroundColor: hover && !disabled ? '#10B981' : '#059669',
+        color: 'white',
+        border: 'none',
+        borderRadius: '10px',
+        fontWeight: '600',
+        fontSize: '14px',
+        cursor: disabled ? 'not-allowed' : 'pointer',
+        transition: 'all 0.3s',
+        opacity: disabled ? 0.6 : 1
       }}
     >
       {icon}

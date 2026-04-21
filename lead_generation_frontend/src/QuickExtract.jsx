@@ -22,8 +22,10 @@ import {
   FileText,
   Search,
   ChevronLeft,
-  ChevronRight 
+  ChevronRight,
+  Info
 } from "lucide-react";
+import { FaPaperPlane } from "react-icons/fa";
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import ServerHtmlPreview from "./ServerHtmlPreview";
@@ -50,7 +52,19 @@ const GOOGLE_MAPS_FIELDS = {
 
 const PreviewModal = ({ data, onClose, onNext, onPrevious, currentStep, isLoading = false }) => {
   if (!data) return null;
-  const headers = data.data && data.data.length > 0 ? Object.keys(data.data[0]) : [];
+  
+  // Dynamically get all headers from all rows (not just the first row)
+  // This ensures we capture all columns even when following links or pagination changes columns
+  const getAllHeaders = () => {
+    if (!data.data || data.data.length === 0) return [];
+    const headerSet = new Set();
+    data.data.forEach(row => {
+      Object.keys(row).forEach(key => headerSet.add(key));
+    });
+    return Array.from(headerSet);
+  };
+  
+  const headers = getAllHeaders();
   const isFirstStep = currentStep <= 1;
 
   return (
@@ -188,7 +202,7 @@ const PreviewModal = ({ data, onClose, onNext, onPrevious, currentStep, isLoadin
   );
 };
 
-const MetadataInput = ({ value, onChange, options }) => {
+const MetadataInput = ({ value, onChange, options, className = "" }) => {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef(null);
 
@@ -202,22 +216,26 @@ const MetadataInput = ({ value, onChange, options }) => {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  // Determine padding based on className prop or default
+  const paddingClass = className.includes("p-") ? "" : "p-2.5";
+  const finalClassName = className || paddingClass;
+
   return (
     <div className="relative w-full" ref={dropdownRef}>
       <div 
         className="relative group cursor-pointer"
         onClick={() => setIsOpen(!isOpen)}
       >
-        <div className={`w-full p-3 pl-4 bg-white border rounded-xl text-sm flex items-center justify-between transition-all duration-200 ${isOpen ? 'border-[#49A3C4] ring-2 ring-[#49A3C4]/20' : 'border-gray-200 hover:border-gray-300'}`}>
+        <div className={`w-full ${finalClassName} bg-white border rounded-lg text-sm flex items-center justify-between transition-all duration-200 ${isOpen ? 'border-[#49A3C4] ring-2 ring-[#49A3C4]/20' : 'border-gray-200 hover:border-gray-300'}`}>
           <span className={value ? "text-gray-900 font-medium" : "text-gray-400"}>
             {value || "Select Type"}
           </span>
-          {isOpen ? <ChevronUp size={16} className="text-[#49A3C4]" /> : <ChevronDown size={16} className="text-gray-400" />}
+          {isOpen ? <ChevronUp size={14} className="text-[#49A3C4] flex-shrink-0" /> : <ChevronDown size={14} className="text-gray-400 flex-shrink-0" />}
         </div>
       </div>
 
       {isOpen && (
-        <div className="absolute mt-2 w-full bg-white border border-gray-100 rounded-xl shadow-xl z-20 max-h-48 overflow-y-auto overflow-hidden animate-in fade-in zoom-in-95 duration-100">
+        <div className="absolute mt-2 w-full bg-white border border-gray-100 rounded-xl shadow-xl z-30 max-h-48 overflow-y-auto overflow-hidden animate-in fade-in zoom-in-95 duration-100">
           <div className="p-1">
             {options.map((option) => (
               <div
@@ -338,6 +356,12 @@ export default function QuickExtract() {
   // --- NEW STATE for Selectors ---
   const [scanningSelectors, setScanningSelectors] = useState(false);
   const [availableSelectors, setAvailableSelectors] = useState([]);
+  
+  // --- STATE for Multi-Page Scraping (follow_links) ---
+  const [followLinksConfig, setFollowLinksConfig] = useState([]); // [{ name, selectorField, fieldMappings: [{attribute, selector, extract}] }]
+  
+  // --- REF to prevent multiple task submissions ---
+  const isSubmittingTask = useRef(false);
 
   // --- EFFECTS ---
   useEffect(() => {
@@ -472,14 +496,40 @@ export default function QuickExtract() {
     setPreviewLoading(true);
 
     try {
-      // Only include pagination config for steps > 1
-      const paginationPayload = stepNumber > 1 ? buildPaginationPayload() : null;
+      // CRITICAL FIX: Build pagination config for ALL steps >= 2, not just based on paginationType
+      let paginationPayload = null;
+      if (stepNumber > 1 && paginationType) {
+        paginationPayload = {
+          type: paginationType,
+          ...paginationConfig
+        };
+        console.log("Using pagination config for step", stepNumber, ":", paginationPayload);
+      }
+
+      // Build follow_links from configuration
+      const follow_links = followLinksConfig
+        .filter((fl) => fl.name && fl.name.trim() && fl.selectorField && fl.selectorField.trim())
+        .map((fl) => ({
+          name: fl.name.trim(),
+          selector: fl.selectorField.trim(),
+          field_mappings: (fl.fieldMappings || []).reduce((acc, fm) => {
+            if (fm.attribute && fm.selector && fm.selector.trim()) {
+              acc[fm.attribute] = {
+                selector: fm.selector.trim(),
+                extract: fm.extract || "text"
+              };
+            }
+            return acc;
+          }, {})
+        }))
+        .filter((fl) => Object.keys(fl.field_mappings).length > 0);
 
       // Build the request body
       const requestBody = {
         url,
         container_selector: containerSelector || null,
         field_mappings,
+        follow_links: follow_links.length > 0 ? follow_links : [],
         timeout: 15
       };
 
@@ -605,6 +655,77 @@ export default function QuickExtract() {
   const handleFieldChange = (id, key, value) => {
     setFields(fields.map(f => f.id === id ? { ...f, [key]: value } : f));
   };
+  
+  // Add follow link configuration
+  const handleAddFollowLink = () => {
+    setFollowLinksConfig((prev) => [
+      ...prev,
+      {
+        id: Date.now(),
+        name: `detail_${prev.length + 1}`,
+        selectorField: "",
+        fieldMappings: []
+      }
+    ]);
+  };
+  
+  // Remove follow link configuration
+  const handleRemoveFollowLink = (id) => {
+    setFollowLinksConfig((prev) => prev.filter((fl) => fl.id !== id));
+  };
+  
+  // Update follow link configuration
+  const handleFollowLinkChange = (id, key, value) => {
+    setFollowLinksConfig((prev) =>
+      prev.map((fl) => (fl.id === id ? { ...fl, [key]: value } : fl))
+    );
+  };
+  
+  // Update follow link field mapping
+  const handleUpdateFollowLinkField = (linkId, fieldIndex, key, value) => {
+    setFollowLinksConfig((prev) => {
+      const updated = prev.map((fl) => {
+        if (fl.id === linkId) {
+          const fieldMappings = [...(fl.fieldMappings || [])];
+          const currentField = fieldMappings[fieldIndex] || {};
+          
+          // If attribute is being changed, auto-fill selector and extract from main field mappings
+          if (key === 'attribute' && value) {
+            const mainField = fields.find(f => f.attribute === value);
+            if (mainField) {
+              fieldMappings[fieldIndex] = {
+                attribute: value,
+                selector: mainField.selector || "",
+                extract: mainField.metadata || "text"
+              };
+            } else {
+              fieldMappings[fieldIndex] = { ...currentField, [key]: value };
+            }
+          } else {
+            fieldMappings[fieldIndex] = { ...currentField, [key]: value };
+          }
+          
+          return { ...fl, fieldMappings };
+        }
+        return fl;
+      });
+      return updated;
+    });
+  };
+  
+  // Remove field mapping from follow link
+  const handleRemoveFollowLinkField = (linkId, fieldIndex) => {
+    setFollowLinksConfig((prev) =>
+      prev.map((fl) =>
+        fl.id === linkId
+          ? {
+              ...fl,
+              fieldMappings: (fl.fieldMappings || []).filter((_, i) => i !== fieldIndex)
+            }
+          : fl
+      )
+    );
+  };
 
   const isGoogleMapsSupported = (fieldName) => {
     const normalized = fieldName.toLowerCase().replace(/_/g, '');
@@ -632,10 +753,17 @@ export default function QuickExtract() {
   };
 
   const handleExtractAsTask = async () => {
+    // Prevent multiple submissions
+    if (isSubmittingTask.current || extractingAsTask) {
+      console.log("Task submission already in progress, ignoring duplicate request");
+      return;
+    }
+    
     if (!url.trim()) {
       alert("URL is required!");
       return;
     }
+    
     const field_mappings = {};
     let hasValidMappings = false;
     
@@ -654,6 +782,10 @@ export default function QuickExtract() {
       alert("Add at least one field mapping with attribute name and selector!");
       return;
     }
+    
+    // Set flags immediately to prevent duplicate submissions
+    isSubmittingTask.current = true;
+    setExtractingAsTask(true);
     
     let finalEntityName = null;
     if (storeInDatabase) {
@@ -682,11 +814,13 @@ export default function QuickExtract() {
           } else {
             alert(`Failed to create entity: ${createData.detail || createData.message}`);
             setExtractingAsTask(false);
+            isSubmittingTask.current = false;
             return;
           }
         } catch (err) {
           alert(`Error creating entity: ${err.message}`);
           setExtractingAsTask(false);
+          isSubmittingTask.current = false;
           return;
         }
       } else if (selectedEntity) {
@@ -694,11 +828,11 @@ export default function QuickExtract() {
       } else {
         alert("Please select an existing entity or create a new one to store data in database.");
         setExtractingAsTask(false);
+        isSubmittingTask.current = false;
         return;
       }
     }
     
-    setExtractingAsTask(true);
     setTaskExecutionId(null);
     setTaskStatus(null);
     setExtractedData(null);
@@ -706,10 +840,29 @@ export default function QuickExtract() {
     try {
       const maxItemsValue = maxItems.trim() ? parseInt(maxItems, 10) : null;
       const paginationPayload = buildPaginationPayload();
+      // Build follow_links from configuration
+      const follow_links = followLinksConfig
+        .filter((fl) => fl.name && fl.name.trim() && fl.selectorField && fl.selectorField.trim())
+        .map((fl) => ({
+          name: fl.name.trim(),
+          selector: fl.selectorField.trim(),
+          field_mappings: (fl.fieldMappings || []).reduce((acc, fm) => {
+            if (fm.attribute && fm.selector && fm.selector.trim()) {
+              acc[fm.attribute] = {
+                selector: fm.selector.trim(),
+                extract: fm.extract || "text"
+              };
+            }
+            return acc;
+          }, {})
+        }))
+        .filter((fl) => Object.keys(fl.field_mappings).length > 0);
+      
       const scrapeRequest = {
         url: url,
         container_selector: containerSelector || null,
         field_mappings: field_mappings,
+        follow_links: follow_links.length > 0 ? follow_links : [],
         max_items: maxItemsValue,
         timeout: 15,
         pagination_config: paginationPayload,
@@ -730,13 +883,17 @@ export default function QuickExtract() {
         setTaskStatus({ status: "queued", message: data.message });
         await fetchTaskLogs(data.execution_id);
         pollTaskStatus(data.execution_id);
+        // Keep isSubmittingTask.current = true until task completes or fails
+        // It will be reset in pollTaskStatus when status is "completed" or "failed"
       } else {
         alert(`Failed to queue task: ${data.detail || data.message || 'Unknown error'}`);
         setExtractingAsTask(false);
+        isSubmittingTask.current = false;
       }
     } catch (err) {
       alert(`Error queuing task: ${err.message}`);
       setExtractingAsTask(false);
+      isSubmittingTask.current = false;
     }
   };
 
@@ -746,8 +903,16 @@ export default function QuickExtract() {
         headers: { "ngrok-skip-browser-warning": "true" }
       });
       const data = await res.json();
-      if (data.logs) {
-        setTaskLogs(data.logs);
+      if (data.logs && Array.isArray(data.logs)) {
+        // Only update if logs actually changed to prevent flickering
+        setTaskLogs((prevLogs) => {
+          const prevLogsStr = JSON.stringify(prevLogs);
+          const newLogsStr = JSON.stringify(data.logs);
+          if (prevLogsStr !== newLogsStr) {
+            return data.logs;
+          }
+          return prevLogs;
+        });
       }
     } catch (err) {
       console.error("Error fetching logs:", err);
@@ -757,6 +922,8 @@ export default function QuickExtract() {
   const pollTaskStatus = async (executionId) => {
     const maxAttempts = 300; 
     let attempts = 0;
+    let lastStatus = null;
+    let lastLogFetch = 0;
     
     const poll = async () => {
       try {
@@ -765,20 +932,37 @@ export default function QuickExtract() {
         });
         const data = await res.json();
         
+        // Always update status (React will handle re-renders efficiently)
         setTaskStatus(data);
-        await fetchTaskLogs(executionId);
+        
+        // Only fetch logs if status changed or every 3 seconds (to reduce flickering)
+        const now = Date.now();
+        if (data.status !== lastStatus || (now - lastLogFetch) > 3000) {
+          await fetchTaskLogs(executionId);
+          lastStatus = data.status;
+          lastLogFetch = now;
+        }
         
         if (data.status === "completed" && data.success === true) {
-          setExtractedData({ 
+          // Set extracted data from the response
+          const extractedDataToSet = { 
             ...data, 
             entity_name: "Quick Extract",
-            data: data.data || []
-          });
+            data: data.data || [],
+            total_items: data.total_items || (data.data ? data.data.length : 0),
+            success: true,
+            message: data.message || "Extraction completed successfully"
+          };
+          setExtractedData(extractedDataToSet);
           setExtractingAsTask(false);
           setShowLogs(true);
+          isSubmittingTask.current = false; // Reset flag on completion
+          // Stop polling after completion
           return;
         } else if (data.status === "failed") {
           setExtractingAsTask(false);
+          isSubmittingTask.current = false; // Reset flag on failure
+          // Stop polling on failure
           return;
         } else if (data.status === "processing" || data.status === "pending" || data.status === "queued") {
           attempts++;
@@ -787,6 +971,7 @@ export default function QuickExtract() {
           } else {
             alert("Task execution timed out");
             setExtractingAsTask(false);
+            isSubmittingTask.current = false; // Reset flag on timeout
           }
         } else {
           attempts++;
@@ -795,6 +980,7 @@ export default function QuickExtract() {
           } else {
             alert("Task execution timed out");
             setExtractingAsTask(false);
+            isSubmittingTask.current = false; // Reset flag on timeout
           }
         }
       } catch (err) {
@@ -805,6 +991,7 @@ export default function QuickExtract() {
         } else {
           alert("Error checking task status");
           setExtractingAsTask(false);
+          isSubmittingTask.current = false; // Reset flag on error
         }
       }
     };
@@ -812,9 +999,19 @@ export default function QuickExtract() {
     setTimeout(poll, 1000);
   };
 
+  // Helper function to get all unique headers from all data rows
+  const getAllDataHeaders = (data) => {
+    if (!data || data.length === 0) return [];
+    const headerSet = new Set();
+    data.forEach(row => {
+      Object.keys(row).forEach(key => headerSet.add(key));
+    });
+    return Array.from(headerSet);
+  };
+
   const exportToCSV = () => {
     if (!extractedData || !extractedData.data || extractedData.data.length === 0) { alert("No data to export!"); return; }
-    const headers = Object.keys(extractedData.data[0]);
+    const headers = getAllDataHeaders(extractedData.data);
     const csvRows = [headers.join(','), ...extractedData.data.map(row => headers.map(header => {
       const value = row[header] || '';
       if (typeof value === 'string' && (value.includes(',') || value.includes('"') || value.includes('\n'))) { return `"${value.replace(/"/g, '""')}"`; }
@@ -830,7 +1027,7 @@ export default function QuickExtract() {
   const exportToExcel = () => {
     if (!extractedData || !extractedData.data || extractedData.data.length === 0) { alert("No data to export!"); return; }
     try {
-      const headers = Object.keys(extractedData.data[0]);
+      const headers = getAllDataHeaders(extractedData.data);
       let xml = '<?xml version="1.0"?><?mso-application progid="Excel.Sheet"?><Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet" xmlns:html="http://www.w3.org/TR/REC-html40"><Worksheet ss:Name="Sheet1"><Table>';
       xml += '<Row>' + headers.map(h => `<Cell><Data ss:Type="String">${escapeXml(h)}</Data></Cell>`).join('') + '</Row>';
       extractedData.data.forEach(row => {
@@ -848,7 +1045,38 @@ export default function QuickExtract() {
   };
 
   const escapeXml = (unsafe) => unsafe.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&apos;");
+// In QuickExtract component, add this function before the return statement:
 
+  const startOutreach = () => {
+    if (!extractedData?.data || extractedData.data.length === 0) {
+      alert("No data to export to outreach!");
+      return;
+    }
+  
+    // Transform scraped data to Outreach contact format
+    const outreachContacts = extractedData.data.map(record => ({
+      name: record.name || record.business_name || record.title || record.company || "",
+      email: record.email || record.business_email || "",
+      company: record.company || record.business_name || record.name || "",
+      company_website: record.website || record.url || "",
+      industry: record.category || record.industry || "",
+      phone: record.phone || "",
+      address: record.address || "",
+      source_name: "Quick Extract",
+      // Preserve original data as fallback
+      ...record
+    }));
+  
+    // Save to localStorage
+    localStorage.setItem('outreach_pending_contacts', JSON.stringify({
+      contacts: outreachContacts,
+      timestamp: Date.now(),
+      source: 'quick_extract'
+    }));
+  
+    // Navigate to outreach page
+    window.location.href = '/outreach';
+  };  
   // --- RENDER ---
   return (
     <div className="min-h-screen bg-slate-50 text-slate-800 font-sans selection:bg-[#49A3C4] selection:text-white">
@@ -983,7 +1211,7 @@ export default function QuickExtract() {
                   <button
                     onClick={handleExtractAsTask}
                     disabled={extractingAsTask}
-                    className="flex items-center gap-2 px-6 py-2.5 bg-gradient-to-b from-[#005f7f] to-[#00364A] text-white rounded-lg shadow-md hover:bg-[#49A3C4] hover:shadow-lg transition-all disabled:opacity-50 font-bold"
+                    className="flex items-center gap-2 px-6 py-2.5 bg-gradient-to-b from-[#005f7f] to-[#00364A] text-white rounded-lg shadow-md hover:bg-[#49A3C4] hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed font-bold"
                     title="Execute extraction as task through scheduler (does not store in database)"
                   >
                     {extractingAsTask ? <Loader2 size={18} className="animate-spin" /> : <Play size={18} />}
@@ -1011,7 +1239,7 @@ export default function QuickExtract() {
                     </div>
                   )}
 
-                  {(extractingAsTask || (taskStatus && taskStatus.status === "completed")) && taskStatus && (
+                  {taskStatus && (extractingAsTask || taskStatus.status === "completed" || taskStatus.status === "failed") && (
                     <div className="mb-8 space-y-4">
                       <div className="p-4 bg-gradient-to-r from-purple-50 to-white border border-purple-200 rounded-xl flex gap-4 shadow-sm">
                         <div className="p-2 bg-white rounded-lg shadow-sm h-fit text-purple-600">
@@ -1042,21 +1270,32 @@ export default function QuickExtract() {
                               {taskStatus.items_scraped} items scraped successfully
                             </p>
                           )}
-                          {taskStatus.status === "completed" && extractedData && (
+                          {taskStatus.status === "completed" && taskStatus.success && (extractedData || taskStatus.data) && (
                             <div className="mt-3 p-3 bg-gradient-to-r from-green-50 to-blue-50 border border-green-200 rounded-lg">
                               <p className="text-sm font-semibold text-[#00364A] mb-2">
                                 ✓ Extraction completed! View your data and export options below.
                               </p>
                               <p className="text-xs text-gray-600">
-                                Go to <strong>Show Data and Export</strong> to view results and download in CSV or Excel format.
+                                Click <strong>"Show Data & Export"</strong> button to view results and download in CSV or Excel format.
                               </p>
                             </div>
                           )}
                         </div>
                         <div className="flex flex-col gap-2">
-                          {taskStatus.status === "completed" && extractedData && (
+                          {taskStatus.status === "completed" && taskStatus.success && (extractedData || taskStatus.data) && (
                             <button
-                              onClick={() => setCurrentStep(3)}
+                              onClick={() => {
+                                // Ensure extractedData is set if not already
+                                if (!extractedData && taskStatus.data) {
+                                  setExtractedData({
+                                    ...taskStatus,
+                                    entity_name: "Quick Extract",
+                                    data: taskStatus.data || [],
+                                    total_items: taskStatus.total_items || (taskStatus.data ? taskStatus.data.length : 0)
+                                  });
+                                }
+                                setCurrentStep(3);
+                              }}
                               className="px-5 py-2.5 text-sm bg-gradient-to-b from-green-500 to-green-600 text-white rounded-lg hover:bg-green-700 font-bold shadow-md hover:shadow-lg transition-all flex items-center gap-2"
                             >
                               <ArrowRight size={16} />
@@ -1704,6 +1943,7 @@ export default function QuickExtract() {
                                   value={field.metadata}
                                   onChange={(val) => handleFieldChange(field.id, "metadata", val)}
                                   options={METADATA_OPTIONS}
+                                  className="p-2.5"
                                 />
                               </div>
                             </div>
@@ -1711,6 +1951,150 @@ export default function QuickExtract() {
                         );
                       })}
                     </div>
+                  </div>
+                  
+                  {/* Multi-Page Scraping Configuration */}
+                  <div className="mt-8 p-6 bg-gradient-to-r from-blue-50 to-cyan-50 border-2 border-[#49A3C4] rounded-xl">
+                    <div className="flex justify-between items-center mb-4">
+                      <div>
+                        <h3 className="text-lg font-bold text-[#00364A]">Multi-Page Scraping</h3>
+                        <p className="text-sm text-gray-600 mt-1">Extract data from detail pages linked from the listing page</p>
+                      </div>
+                      <button
+                        onClick={handleAddFollowLink}
+                        className="flex items-center gap-2 px-4 py-2 bg-gradient-to-b from-[#005f7f] to-[#00364A] text-white rounded-lg hover:bg-[#49A3C4] transition-colors text-sm font-bold"
+                      >
+                        <Plus size={16} /> Add Detail Page
+                      </button>
+                    </div>
+                    
+                    {/* Instructions Box */}
+                    <div className="mb-6 p-4 bg-white rounded-lg border border-[#49A3C4] border-l-4">
+                      <div className="flex gap-3 items-start">
+                        <Info size={18} color="#00364A" className="mt-0.5 flex-shrink-0" />
+                        <div className="flex-1 text-sm text-[#00364A]">
+                          <h4 className="font-bold mb-2">How to Configure Multi-Page Scraping:</h4>
+                          <ol className="list-decimal list-inside space-y-1 text-xs">
+                            <li>Click <strong>"Add Detail Page"</strong> to add a new detail page configuration.</li>
+                            <li>Enter the <strong>Link CSS Selector</strong> (e.g., "a.profile-link"). The system will automatically extract the href attribute.</li>
+                            <li>Add fields to extract from detail pages. Selectors will be auto-filled if the same attribute exists in the main mapping above.</li>
+                          </ol>
+                          <div className="mt-3 p-2 bg-blue-50 rounded text-xs">
+                            <strong>💡 How it works:</strong> The system will extract the URL from your CSS selector, visit each detail page, scrape the additional fields you configure, and merge everything into a single record.
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    {followLinksConfig.map((fl, flIndex) => (
+                      <div key={fl.id} className="mb-4 p-4 bg-white rounded-lg border border-[#49A3C4]">
+                        <div className="flex justify-between items-start mb-4">
+                          <div className="flex-1 grid grid-cols-2 gap-3">
+                            <div>
+                              <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Link Name</label>
+                              <input
+                                type="text"
+                                value={fl.name}
+                                onChange={(e) => handleFollowLinkChange(fl.id, 'name', e.target.value)}
+                                placeholder="e.g., profile, detail"
+                                className="w-full p-2 text-sm border border-gray-200 rounded-lg focus:border-[#49A3C4] focus:ring-2 focus:ring-[#49A3C4]/20 outline-none"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Link CSS Selector</label>
+                              <SelectorInput
+                                placeholder="e.g., a.profile-link"
+                                value={fl.selectorField || ""}
+                                onChange={(val) => handleFollowLinkChange(fl.id, 'selectorField', val)}
+                                options={availableSelectors}
+                                className="w-full p-2 text-sm border border-gray-200 rounded-lg focus:border-[#49A3C4] focus:ring-2 focus:ring-[#49A3C4]/20 outline-none font-mono"
+                              />
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => handleRemoveFollowLink(fl.id)}
+                            className="ml-3 p-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
+                          >
+                            <X  className="text-black"size={16} />
+                          </button>
+                        </div>
+                        
+                        <div>
+                          <label className="text-xs font-bold text-gray-500 uppercase mb-2 block">Fields to Extract from Detail Page</label>
+                          {(fl.fieldMappings || []).map((fm, fmIndex) => (
+                            <div key={fmIndex} className="mb-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                              <div className="flex justify-end mb-2">
+                                <button
+                                  onClick={() => handleRemoveFollowLinkField(fl.id, fmIndex)}
+                                  className="p-1.5 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors flex items-center justify-center"
+                                  title="Remove field"
+                                >
+                                  <X className="text-black" size={14} />
+                                </button>
+                              </div>
+                              <div className="grid grid-cols-12 gap-3">
+                                <div className="col-span-3">
+                                  <label className="text-xs text-gray-600 mb-1 block">Attribute</label>
+                                  <select
+                                    value={fm.attribute || ""}
+                                    onChange={(e) => handleUpdateFollowLinkField(fl.id, fmIndex, 'attribute', e.target.value)}
+                                    className="w-full p-2.5 text-sm border border-gray-200 rounded-lg focus:border-[#49A3C4] focus:ring-2 focus:ring-[#49A3C4]/20 outline-none bg-white"
+                                  >
+                                    <option value="">Select attribute...</option>
+                                    {fields
+                                      .filter((f) => f.attribute && f.attribute.trim())
+                                      .map((f) => (
+                                        <option key={f.id} value={f.attribute}>
+                                          {f.attribute}
+                                        </option>
+                                      ))}
+                                  </select>
+                                </div>
+                                <div className="col-span-6">
+                                  <label className="text-xs text-gray-600 mb-1 block">CSS Selector</label>
+                                  <SelectorInput
+                                    placeholder={fm.attribute && fields.find(f => f.attribute === fm.attribute)?.selector 
+                                      ? `Auto-filled: ${fields.find(f => f.attribute === fm.attribute).selector}` 
+                                      : "CSS Selector"}
+                                    value={fm.selector || ""}
+                                    onChange={(val) => handleUpdateFollowLinkField(fl.id, fmIndex, 'selector', val)}
+                                    options={availableSelectors}
+                                    className="w-full p-2.5 text-sm border border-gray-200 rounded-lg focus:border-[#49A3C4] focus:ring-2 focus:ring-[#49A3C4]/20 outline-none font-mono bg-white"
+                                  />
+                                </div>
+                                <div className="col-span-3">
+                                  <label className="text-xs text-gray-600 mb-1 block">Extract Type</label>
+                                  <div className="relative">
+                                    <MetadataInput
+                                      value={fm.extract || "text"}
+                                      onChange={(val) => handleUpdateFollowLinkField(fl.id, fmIndex, 'extract', val)}
+                                      options={METADATA_OPTIONS}
+                                      className="p-2.5"
+                                    />
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                          <button
+                            onClick={() => {
+                              const updated = [...(fl.fieldMappings || []), { attribute: "", selector: "", extract: "text" }];
+                              handleFollowLinkChange(fl.id, 'fieldMappings', updated);
+                            }}
+                            className="mt-2 px-3 py-1.5 bg-blue-50 text-[#00364A] border border-[#49A3C4] rounded-lg hover:bg-blue-100 transition-colors text-xs font-bold"
+                          >
+                            + Add Field
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                    
+                    {followLinksConfig.length === 0 && (
+                      <div className="text-center py-6 text-gray-500 text-sm">
+                        <p className="mb-2">No detail pages configured yet.</p>
+                        <p className="text-xs">Click "Add Detail Page" to enable multi-page scraping.</p>
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -1737,20 +2121,29 @@ export default function QuickExtract() {
                     <p className="text-gray-500">Data extracted from {url}</p>
                   </div>
                   
-                  <div className="flex gap-3">
-                    <button
-                      onClick={exportToCSV}
-                      className="flex items-center gap-2 px-6 py-3 bg-white text-[#00364A] border border-gray-200 rounded-xl font-bold shadow-sm hover:bg-gray-50 hover:border-[#49A3C4] transition-all"
-                    >
-                      <Download size={20} /> CSV
-                    </button>
-                    <button
-                      onClick={exportToExcel}
-                      className="flex items-center gap-2 px-6 py-3 bg-white text-[#00364A] border border-gray-200 rounded-xl font-bold shadow-sm hover:bg-gray-50 hover:border-[#49A3C4] transition-all"
-                    >
-                      <FileSpreadsheet size={20} /> Excel
-                    </button>
-                  </div>
+                {/* In Step 3 results section, add this button alongside CSV/Excel buttons */}
+                <div className="flex gap-3">
+                  <button
+                    onClick={exportToCSV}
+                    className="flex items-centser gap-2 px-6 py-3 bg-white text-[#00364A] border border-gray-200 rounded-xl font-bold shadow-sm hover:bg-gray-50 hover:border-[#49A3C4] transition-all"
+                  >
+                    <Download size={20} /> CSV
+                  </button>
+                  <button
+                    onClick={exportToExcel}
+                    className="flex items-center gap-2 px-6 py-3 bg-white text-[#00364A] border border-gray-200 rounded-xl font-bold shadow-sm hover:bg-gray-50 hover:border-[#49A3C4] transition-all"
+                  >
+                    <FileSpreadsheet size={20} /> Excel
+                  </button>
+
+                  {/* NEW BUTTON - Start Outreach */}
+                  <button
+                    onClick={startOutreach}
+                    className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-[#49A3C4] to-[#00364A] text-white rounded-xl font-bold shadow-md hover:shadow-lg transition-all"
+                  >
+                    <FaPaperPlane size={18} /> Start Outreach
+                  </button>
+                </div>
                 </div>
 
                 <div className="flex-grow bg-gray-50 p-6 overflow-hidden">
@@ -1760,7 +2153,7 @@ export default function QuickExtract() {
                         <table className="w-full text-sm text-left text-gray-600">
                           <thead className="bg-gray-50 text-xs text-gray-500 uppercase font-semibold border-b border-gray-200 sticky top-0">
                             <tr>
-                              {Object.keys(extractedData.data[0]).map((header) => (
+                              {getAllDataHeaders(extractedData.data).map((header) => (
                                 <th key={header} className="px-6 py-4 whitespace-nowrap bg-gray-50">
                                   {header}
                                 </th>
@@ -1770,7 +2163,7 @@ export default function QuickExtract() {
                           <tbody className="divide-y divide-gray-100">
                             {extractedData.data.map((item, index) => (
                               <tr key={index} className="hover:bg-blue-50/30 transition-colors">
-                                {Object.keys(extractedData.data[0]).map((header) => (
+                                {getAllDataHeaders(extractedData.data).map((header) => (
                                   <td key={`${index}-${header}`} className="px-6 py-4 whitespace-nowrap">
                                     {String(item[header] || '')}
                                   </td>
@@ -1810,6 +2203,8 @@ export default function QuickExtract() {
                       setShowLogs(false);
                       setExtractingAsTask(false);
                       setAvailableSelectors([]);
+                      setFollowLinksConfig([]);
+                      isSubmittingTask.current = false; // Reset submission flag
                     }}
                     className="text-gray-500 font-semibold hover:text-[#00364A] px-6 py-2 transition-colors"
                   >
