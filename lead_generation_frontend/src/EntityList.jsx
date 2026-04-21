@@ -1,106 +1,221 @@
-import React, { useState, useEffect } from "react";
-import { 
-  Database, 
-  Edit3, 
-  Trash2, 
-  Plus, 
-  Save, 
-  X, 
-  ChevronDown, 
-  ChevronRight, 
-  AlertCircle, 
-  CheckCircle, 
-  Undo, 
-  Columns, 
-  List, 
-  Search, 
-  RefreshCw, 
-  Shield, 
+import React, { useState } from "react";
+import {
+  Database,
+  Edit3,
+  Trash2,
+  Plus,
+  Save,
+  X,
+  ChevronDown,
+  ChevronRight,
+  AlertCircle,
+  CheckCircle,
+  Undo,
+  Columns,
+  List,
+  Search,
+  RefreshCw,
+  Shield,
   Type,
-  ArrowLeft
+  Eye,
+  ChevronLeft,
+  ChevronRight as ChevronRightIcon2,
+  Loader2
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import API_BASE from "./api_base";
+import Layout from "./components/Layout";
+
 const EntityList = () => {
-  const [entities, setEntities] = useState([]);
   const [expandedEntity, setExpandedEntity] = useState(null);
   const [editingEntity, setEditingEntity] = useState(null);
   const [editAttributes, setEditAttributes] = useState([]);
   const [response, setResponse] = useState(null);
-  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
+  const [exportLoading, setExportLoading] = useState({ csv: null, excel: null });
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize] = useState(10);
+  const [navigatingDirection, setNavigatingDirection] = useState(null);
+  
   const navigate = useNavigate();
-  useEffect(() => {
-    fetchEntities();
-  }, []);
+  const queryClient = useQueryClient();
 
-  const fetchEntities = async () => {
-    try {
-      setLoading(true);
-      const response = await fetch(`${API_BASE}/entity/entities`, {
+  // Fetch entities list with pagination
+  const { 
+    data: entitiesData, 
+    isLoading: isLoadingEntities,
+    isFetching: isFetchingEntities 
+  } = useQuery({
+    queryKey: ['entities', currentPage, pageSize],
+    queryFn: async () => {
+      const response = await fetch(
+        `${API_BASE}/entity/entities?page=${currentPage}&page_size=${pageSize}`,
+        {
+          headers: {
+            "ngrok-skip-browser-warning": "true"
+          }
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      return {
+        entities: data.entities || [],
+        totalEntities: data.total_entities || 0
+      };
+    },
+    refetchOnMount: true,
+  });
+
+  // Reset navigation direction when fetching completes
+  React.useEffect(() => {
+    if (!isFetchingEntities) {
+      setNavigatingDirection(null);
+    }
+  }, [isFetchingEntities]);
+
+  // Fetch entity details only when expanded (lazy loading)
+  const { data: entityDetails } = useQuery({
+    queryKey: ['entity-details', expandedEntity],
+    queryFn: async () => {
+      if (!expandedEntity) return null;
+
+      const response = await fetch(`${API_BASE}/entity/entity-info/${expandedEntity}`, {
         headers: {
           "ngrok-skip-browser-warning": "true"
         }
       });
-      
+
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
-      
+
       const data = await response.json();
-      
-      if (data.entities) {
-        const entitiesWithDetails = await Promise.all(
-          data.entities.map(async (entity) => {
-            const detailResponse = await fetchEntityInfo(entity.name);
-            if (detailResponse) {
-              return {
-                name: entity.name,
-                columns: detailResponse.columns,
-                row_count: detailResponse.row_count
-              };
-            } else {
-              return {
-                name: entity.name,
-                columns: entity.columns.map(col => ({ name: col, type: "unknown", nullable: "YES" })),
-                row_count: 0
-              };
-            }
-          })
-        );
-        setEntities(entitiesWithDetails);
-      } else {
-        setEntities([]);
+      if (data.success) {
+        return {
+          name: expandedEntity,
+          columns: data.columns,
+          row_count: data.row_count
+        };
       }
-    } catch (error) {
-      console.error("Error fetching entities:", error);
-      setResponse({ type: "error", message: `Failed to fetch entities: ${error.message}` });
-      setEntities([]);
-    } finally {
-      setLoading(false);
+      return null;
+    },
+    enabled: !!expandedEntity,
+  });
+
+  const entities = entitiesData?.entities || [];
+  const totalEntities = entitiesData?.totalEntities || 0;
+  const totalPages = Math.ceil(totalEntities / pageSize);
+
+  // Pagination handlers
+  const handlePreviousPage = () => {
+    if (currentPage > 1) {
+      setNavigatingDirection('prev');
+      setCurrentPage(p => p - 1);
+      setExpandedEntity(null); // Collapse expanded entity when changing pages
+      setEditingEntity(null);
     }
   };
 
-  const fetchEntityInfo = async (entityName) => {
+  const handleNextPage = () => {
+    if (currentPage < totalPages) {
+      setNavigatingDirection('next');
+      setCurrentPage(p => p + 1);
+      setExpandedEntity(null); // Collapse expanded entity when changing pages
+      setEditingEntity(null);
+    }
+  };
+
+  // CSV Export Handler
+  const handleCSVExport = async (e, entityName) => {
+    e.stopPropagation();
+    setExportLoading(prev => ({ ...prev, csv: entityName }));
+
     try {
-      const response = await fetch(`${API_BASE}/entity/entity-info/${entityName}`, {
+      const response = await fetch(`${API_BASE}/export/csv/${entityName}`, {
         headers: {
           "ngrok-skip-browser-warning": "true"
         }
       });
-      
+
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        throw new Error(`Export failed: ${response.status}`);
       }
-      
-      const data = await response.json();
-      if (data.success) {
-        return data;
-      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${entityName}_export.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+
+      setResponse({
+        type: "success",
+        message: `Successfully exported ${entityName} as CSV`
+      });
     } catch (error) {
-      console.error("Error fetching entity info:", error);
+      console.error("CSV Export error:", error);
+      setResponse({
+        type: "error",
+        message: `Failed to export ${entityName} as CSV: ${error.message}`
+      });
+    } finally {
+      setExportLoading(prev => ({ ...prev, csv: null }));
     }
-    return null;
+
+    setTimeout(() => setResponse(null), 5000);
+  };
+
+  // Excel Export Handler
+  const handleExcelExport = async (e, entityName) => {
+    e.stopPropagation();
+    setExportLoading(prev => ({ ...prev, excel: entityName }));
+
+    try {
+      const response = await fetch(`${API_BASE}/export/excel/${entityName}`, {
+        headers: {
+          "ngrok-skip-browser-warning": "true"
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`Export failed: ${response.status}`);
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${entityName}_export.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+
+      setResponse({
+        type: "success",
+        message: `Successfully exported ${entityName} as Excel`
+      });
+    } catch (error) {
+      console.error("Excel Export error:", error);
+      setResponse({
+        type: "error",
+        message: `Failed to export ${entityName} as Excel: ${error.message}`
+      });
+    } finally {
+      setExportLoading(prev => ({ ...prev, excel: null }));
+    }
+
+    setTimeout(() => setResponse(null), 5000);
   };
 
   const toggleExpand = (entityName) => {
@@ -111,7 +226,7 @@ const EntityList = () => {
   const startEditing = (entity) => {
     setEditingEntity(entity.name);
     const editableAttrs = entity.columns
-      .filter(col => col.name !== "id")
+      .filter(col => col.name !== "id" && col.name !== "modified_at")
       .map(col => ({
         name: col.name,
         originalName: col.name,
@@ -132,31 +247,31 @@ const EntityList = () => {
   };
 
   const addAttribute = () => {
-    setEditAttributes([...editAttributes, { 
-      name: "", 
-      originalName: null, 
-      datatype: "text", 
+    setEditAttributes([...editAttributes, {
+      name: "",
+      originalName: null,
+      datatype: "text",
       nullable: "optional",
-      action: 'add' 
+      action: 'add'
     }]);
   };
 
   const updateAttribute = (index, field, value) => {
     const updated = [...editAttributes];
     updated[index][field] = value;
-    
+
     if (field === 'name' && updated[index].originalName && updated[index].originalName !== value) {
       updated[index].action = 'rename';
     } else if (field === 'name' && updated[index].originalName && updated[index].originalName === value) {
       updated[index].action = 'keep';
     }
-    
+
     setEditAttributes(updated);
   };
 
   const removeAttribute = (index) => {
     const attr = editAttributes[index];
-    
+
     if (attr.originalName) {
       const updated = [...editAttributes];
       updated[index].action = 'remove';
@@ -191,14 +306,14 @@ const EntityList = () => {
 
         const addResponse = await fetch(`${API_BASE}/entity/edit-entity/${editingEntity}`, {
           method: "PUT",
-          headers: { 
+          headers: {
             "Content-Type": "application/json",
             "ngrok-skip-browser-warning": "true"
           },
           body: JSON.stringify(addPayload),
         });
         const addData = await addResponse.json();
-        
+
         if (addData.success) {
           operations.push(`Added ${toAdd.length} column(s)`);
         } else {
@@ -214,7 +329,7 @@ const EntityList = () => {
           }
         });
         const removeData = await removeResponse.json();
-        
+
         if (removeData.success) {
           operations.push(`Removed column '${attr.originalName}'`);
         } else {
@@ -229,7 +344,7 @@ const EntityList = () => {
             "ngrok-skip-browser-warning": "true"
           }
         });
-        
+
         if (renameResponse.ok) {
           const renameData = await renameResponse.json();
           if (renameData.success) {
@@ -243,21 +358,21 @@ const EntityList = () => {
       }
 
       if (allSuccessful && operations.length > 0) {
-        setResponse({ 
-          type: "success", 
-          message: `Entity updated successfully: ${operations.join(', ')}` 
+        setResponse({
+          type: "success",
+          message: `Entity updated successfully: ${operations.join(', ')}`
         });
       } else if (operations.length > 0) {
-        setResponse({ 
-          type: "success", 
-          message: `Partially updated: ${operations.join(', ')}` 
+        setResponse({
+          type: "success",
+          message: `Partially updated: ${operations.join(', ')}`
         });
       } else {
         setResponse({ type: "error", message: "No changes were made" });
       }
 
       setEditingEntity(null);
-      fetchEntities();
+      queryClient.invalidateQueries({ queryKey: ['entity-details', editingEntity] });
 
     } catch (error) {
       console.error("Error saving changes:", error);
@@ -285,7 +400,8 @@ const EntityList = () => {
         setResponse({ type: "success", message: data.message });
         setExpandedEntity(null);
         setEditingEntity(null);
-        fetchEntities();
+        // Refetch current page after deletion
+        queryClient.invalidateQueries({ queryKey: ['entities', currentPage, pageSize] });
       } else {
         setResponse({ type: "error", message: "Failed to delete entity" });
       }
@@ -302,58 +418,43 @@ const EntityList = () => {
     setEditAttributes([]);
   };
 
-  const filteredEntities = entities.filter(entity => 
-    entity.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    entity.columns.some(col => col.name.toLowerCase().includes(searchTerm.toLowerCase()))
+  // Filter entities based on search term (client-side filtering on current page)
+  const filteredEntities = entities.filter(entity =>
+    entity.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  if (loading) {
+  const loading = isLoadingEntities;
+
+  if (loading && !entitiesData) {
     return (
-      <div style={{
-        minHeight: '100vh',
-        backgroundColor: '#C7D8ED',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        flexDirection: 'column',
-        gap: '20px'
-      }}>
+      <Layout pageTitle="Entity Manager">
         <div style={{
-           width: '40px',
-           height: '40px',
-           border: '4px solid #49A3C4',
-           borderTop: '4px solid transparent',
-           borderRadius: '50%',
-           animation: 'spin 1s linear infinite'
-        }} />
-        <h1 style={{ fontSize: '24px', color: '#00364A', fontWeight: '700' }}>Loading Entities...</h1>
-        <style>{`@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`}</style>
-      </div>
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          flexDirection: 'column',
+          gap: '20px',
+          height: '50vh'
+        }}>
+          <Loader2 size={48} className="spin" style={{ color: '#00364A' }} />
+          <h2 style={{ fontSize: '20px', color: '#00364A', fontWeight: '600' }}>Loading Entities...</h2>
+        </div>
+      </Layout>
     );
   }
 
   return (
-    <div style={{
-      minHeight: '100vh',
-      backgroundColor: '#C7D8ED',
-      color: '#00364A',
-      fontFamily: "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif",
-      padding: '40px 20px',
-      display: 'flex',
-      justifyContent: 'center',
-      alignItems: 'flex-start'
-    }}>
+    <Layout pageTitle="Entity Manager">
       <div style={{
         width: '100%',
-        maxWidth: '1200px',
         backgroundColor: 'white',
         borderRadius: '25px',
         boxShadow: '0 15px 50px rgba(0, 54, 74, 0.15)',
         overflow: 'hidden'
       }}>
-        {/* Header */}
+        {/* Header Actions */}
         <div style={{
-          padding: '40px 50px',
+          padding: '30px 40px',
           borderBottom: '1px solid rgba(0, 54, 74, 0.1)',
           display: 'flex',
           justifyContent: 'space-between',
@@ -361,223 +462,285 @@ const EntityList = () => {
           flexWrap: 'wrap',
           gap: '20px'
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
             <div style={{
-              width: '56px',
-              height: '56px',
+              width: '48px',
+              height: '48px',
               backgroundColor: '#49A3C4',
-              borderRadius: '15px',
+              borderRadius: '12px',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               color: 'white'
             }}>
-              <Database size={28} />
+              <Database size={24} />
             </div>
             <div>
-              <h1 style={{
-                fontSize: '32px',
-                fontWeight: '800',
+              <h2 style={{
+                fontSize: '24px',
+                fontWeight: '700',
                 color: '#00364A',
-                margin: 0,
-                lineHeight: '1.2'
-              }}>Entity Manager</h1>
+                margin: 0
+              }}>Entity Manager</h2>
               <p style={{
-                fontSize: '16px',
+                fontSize: '14px',
                 color: '#00364A',
-                opacity: 0.7,
-                margin: '5px 0 0 0'
-              }}>View and manage your database entities</p>
+                opacity: 0.6,
+                margin: '4px 0 0 0'
+              }}>View & manage your entities and their attributes</p>
             </div>
           </div>
-          <div
-          style={{
-          padding: '10px 10px',
-          display: 'flex',
-          justifyContent: 'right',
-          alignItems: 'center',
-          flexWrap: 'wrap',
-          gap: '20px'
-        }}>
-          <button
-             style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              padding: '12px 24px',
-              backgroundColor: 'white',
-              color: '#00364A',
-              borderRadius: '12px',
-              border: '2px solid #00364A',
-              fontWeight: '600',
-              cursor: 'pointer',
-              transition: 'all 0.3s'
-            }}
-            onMouseEnter={(e) => {
-              e.target.style.backgroundColor = '#00364A';
-              e.target.style.color = 'white';
-            }}
-            onMouseLeave={(e) => {
-              e.target.style.backgroundColor = 'white';
-              e.target.style.color = '#00364A';
-            }}
-            onClick={() => navigate('/dashboard')}
-          >
-          <ArrowLeft size={18} />
-            Dashboard
+          
+          <div style={{ display: 'flex', gap: '12px' }}>
+            <button
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '10px 20px',
+                backgroundColor: '#00364A',
+                color: 'white',
+                borderRadius: '10px',
+                border: 'none',
+                fontWeight: '600',
+                fontSize: '14px',
+                cursor: 'pointer',
+                transition: 'all 0.2s'
+              }}
+              onMouseEnter={(e) => {
+                e.target.style.backgroundColor = '#004e6b';
+                e.target.style.transform = 'translateY(-2px)';
+                e.target.style.boxShadow = '0 4px 12px rgba(0, 54, 74, 0.2)';
+              }}
+              onMouseLeave={(e) => {
+                e.target.style.backgroundColor = '#00364A';
+                e.target.style.transform = 'translateY(0)';
+                e.target.style.boxShadow = 'none';
+              }}
+              onClick={() => navigate('/entityform')}
+            >
+              <Plus size={16} />
+              Create Entity
             </button>
-          <button 
-            onClick={fetchEntities}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              padding: '12px 24px',
-              backgroundColor: 'white',
-              color: '#00364A',
-              borderRadius: '12px',
-              border: '2px solid #00364A',
-              fontWeight: '600',
-              cursor: 'pointer',
-              transition: 'all 0.3s'
-            }}
-            onMouseEnter={(e) => {
-              e.target.style.backgroundColor = '#00364A';
-              e.target.style.color = 'white';
-            }}
-            onMouseLeave={(e) => {
-              e.target.style.backgroundColor = 'white';
-              e.target.style.color = '#00364A';
-            }}
-          >
-        
-            <RefreshCw size={18} />
-            Refresh
-          </button>
-        </div>
+            <button
+              onClick={() => {
+                setCurrentPage(1);
+                queryClient.invalidateQueries({ queryKey: ['entities', currentPage, pageSize] });
+              }}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '10px 20px',
+                backgroundColor: 'white',
+                color: '#00364A',
+                borderRadius: '10px',
+                border: '2px solid #00364A',
+                fontWeight: '600',
+                fontSize: '14px',
+                cursor: 'pointer',
+                transition: 'all 0.2s'
+              }}
+              onMouseEnter={(e) => {
+                e.target.style.backgroundColor = '#00364A';
+                e.target.style.color = 'white';
+              }}
+              onMouseLeave={(e) => {
+                e.target.style.backgroundColor = 'white';
+                e.target.style.color = '#00364A';
+              }}
+            >
+              <RefreshCw size={16} className={isFetchingEntities ? 'spin' : ''} />
+              Refresh
+            </button>
+          </div>
         </div>
 
-        <div style={{ padding: '50px' }}>
+        <div style={{ padding: '30px 40px' }}>
           {/* Search and Stats */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px' }}>
-            <div style={{ position: 'relative', width: '40%' }}>
-              <div style={{ position: 'absolute', top: '50%', left: '15px', transform: 'translateY(-50%)', pointerEvents: 'none' }}>
-                <Search size={18} color="#00364A" style={{ opacity: 0.5 }} />
+          <div style={{ 
+            display: 'flex', 
+            justifyContent: 'space-between', 
+            alignItems: 'center', 
+            marginBottom: '25px',
+            flexWrap: 'wrap',
+            gap: '15px'
+          }}>
+            <div style={{ position: 'relative', width: '300px' }}>
+              <div style={{ 
+                position: 'absolute', 
+                top: '50%', 
+                left: '12px', 
+                transform: 'translateY(-50%)', 
+                pointerEvents: 'none',
+                opacity: 0.5
+              }}>
+                <Search size={16} color="#00364A" />
               </div>
               <input
                 type="text"
-                placeholder="Search entities or columns..."
+                placeholder="Search entities..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 style={{
                   width: '100%',
-                  padding: '14px 20px 14px 45px',
-                  borderRadius: '12px',
-                  border: 'none',
-                  backgroundColor: 'rgba(73, 163, 196, 0.15)',
+                  padding: '10px 12px 10px 38px',
+                  borderRadius: '8px',
+                  border: '1px solid rgba(0, 54, 74, 0.1)',
+                  backgroundColor: 'white',
                   color: '#00364A',
-                  fontSize: '15px',
+                  fontSize: '14px',
                   outline: 'none',
-                  transition: 'all 0.3s'
+                  transition: 'all 0.2s'
                 }}
                 onFocus={(e) => {
-                  e.target.style.backgroundColor = 'rgba(73, 163, 196, 0.25)';
-                  e.target.style.boxShadow = '0 0 0 3px rgba(73, 163, 196, 0.2)';
+                  e.target.style.borderColor = '#49A3C4';
+                  e.target.style.boxShadow = '0 0 0 3px rgba(73, 163, 196, 0.1)';
                 }}
                 onBlur={(e) => {
-                  e.target.style.backgroundColor = 'rgba(73, 163, 196, 0.15)';
+                  e.target.style.borderColor = 'rgba(0, 54, 74, 0.1)';
                   e.target.style.boxShadow = 'none';
                 }}
               />
             </div>
-            <div style={{
-              backgroundColor: 'rgba(73, 163, 196, 0.1)',
-              color: '#00364A',
-              padding: '10px 20px',
-              borderRadius: '20px',
-              fontWeight: '600',
-              fontSize: '14px'
-            }}>
-              <span>{filteredEntities.length}</span> entities found
+            
+            <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+              <div style={{
+                backgroundColor: 'rgba(73, 163, 196, 0.1)',
+                color: '#00364A',
+                padding: '8px 16px',
+                borderRadius: '20px',
+                fontWeight: '600',
+                fontSize: '13px'
+              }}>
+                <span>{totalEntities}</span> total entities • Page {currentPage} of {totalPages || 1}
+              </div>
             </div>
           </div>
 
           {response && (
             <div style={{
-              marginBottom: '30px',
-              padding: '20px 25px',
-              borderRadius: '15px',
+              marginBottom: '20px',
+              padding: '14px 20px',
+              borderRadius: '10px',
               display: 'flex',
               alignItems: 'center',
-              gap: '15px',
+              gap: '12px',
               backgroundColor: response.type === "success" ? '#E0F2FE' : '#FEF2F2',
-              border: `2px solid ${response.type === "success" ? '#49A3C4' : '#EF4444'}`,
-              color: '#00364A'
+              border: `1px solid ${response.type === "success" ? '#49A3C4' : '#EF4444'}`,
+              color: '#00364A',
+              fontSize: '14px'
             }}>
-              <div style={{ color: response.type === "success" ? '#49A3C4' : '#EF4444' }}>
-                {response.type === "success" ? <CheckCircle size={20} /> : <AlertCircle size={20} />}
+              <div style={{ color: response.type === "success" ? '#49A3C4' : '#EF4444', flexShrink: 0 }}>
+                {response.type === "success" ? <CheckCircle size={18} /> : <AlertCircle size={18} />}
               </div>
               <span style={{ fontWeight: '500' }}>{response.message}</span>
+            </div>
+          )}
+
+          {isFetchingEntities && (
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '10px',
+              padding: '20px',
+              backgroundColor: '#F8FBFF',
+              borderRadius: '10px',
+              marginBottom: '20px',
+              fontSize: '14px',
+              color: '#00364A'
+            }}>
+              <Loader2 size={18} className="spin" />
+              <span>Loading page {currentPage}...</span>
             </div>
           )}
 
           {filteredEntities.length === 0 ? (
             <div style={{
               textAlign: 'center',
-              padding: '60px',
+              padding: '60px 40px',
               backgroundColor: '#F8FBFF',
-              borderRadius: '20px',
+              borderRadius: '16px',
               border: '2px dashed rgba(0, 54, 74, 0.1)'
             }}>
-              <List size={48} style={{ color: '#49A3C4', marginBottom: '15px', opacity: 0.5 }} />
-              <p style={{ fontSize: '18px', fontWeight: '600', color: '#00364A', marginBottom: '5px' }}>No entities found</p>
-              <p style={{ color: '#00364A', opacity: 0.6 }}>Create your first entity to get started</p>
+              <Database size={48} style={{ color: '#49A3C4', marginBottom: '16px', opacity: 0.5 }} />
+              <h3 style={{ fontSize: '18px', fontWeight: '600', color: '#00364A', marginBottom: '8px' }}>
+                {searchTerm ? 'No matching entities found' : 'No entities yet'}
+              </h3>
+              <p style={{ fontSize: '14px', color: '#00364A', opacity: 0.6, marginBottom: '20px' }}>
+                {searchTerm ? 'Try a different search term' : 'Create your first entity to get started'}
+              </p>
+              {!searchTerm && (
+                <button
+                  onClick={() => navigate('/entityform')}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    padding: '10px 24px',
+                    backgroundColor: '#00364A',
+                    color: 'white',
+                    borderRadius: '8px',
+                    border: 'none',
+                    fontWeight: '600',
+                    fontSize: '14px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  <Plus size={16} />
+                  Create Entity
+                </button>
+              )}
             </div>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-              {filteredEntities.map((entity) => (
-                <div key={entity.name} style={{
-                  backgroundColor: 'white',
-                  border: '2px solid rgba(0, 54, 74, 0.08)',
-                  borderRadius: '20px',
-                  boxShadow: '0 4px 15px rgba(0, 54, 74, 0.05)',
-                  overflow: 'hidden',
-                  transition: 'all 0.3s'
-                }}>
-                  {/* Entity Card Header */}
-                  <div style={{
-                    padding: '25px',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    gap: '20px',
-                    flexWrap: 'wrap'
+            <>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginBottom: '30px' }}>
+                {filteredEntities.map((entity) => (
+                  <div key={entity.name} style={{
+                    backgroundColor: 'white',
+                    border: '1px solid rgba(0, 54, 74, 0.08)',
+                    borderRadius: '16px',
+                    boxShadow: '0 2px 8px rgba(0, 54, 74, 0.03)',
+                    overflow: 'hidden',
+                    transition: 'all 0.2s',
+                    opacity: isFetchingEntities ? 0.7 : 1
                   }}>
-                    {/* Left: Entity Info */}
-                    <div style={{ display: 'flex', alignItems: 'center', flex: '1 1 300px', minWidth: 0 }}>
-                      <button 
-                        onClick={() => toggleExpand(entity.name)}
-                        style={{
-                          marginRight: '15px',
-                          border: 'none',
-                          background: 'none',
-                          cursor: 'pointer',
+                    {/* Entity Card Header */}
+                    <div style={{
+                      padding: '20px',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      gap: '16px',
+                      flexWrap: 'wrap'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0 }}>
+                        <button
+                          onClick={() => toggleExpand(entity.name)}
+                          style={{
+                            border: 'none',
+                            background: 'none',
+                            cursor: 'pointer',
+                            color: '#00364A',
+                            opacity: 0.4,
+                            transition: 'opacity 0.2s',
+                            padding: '4px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            flexShrink: 0
+                          }}
+                          onMouseEnter={(e) => e.target.style.opacity = '0.8'}
+                          onMouseLeave={(e) => e.target.style.opacity = '0.4'}
+                        >
+                          {expandedEntity === entity.name ? <ChevronDown size={20} /> : <ChevronRight size={20} />}
+                        </button>
+                        <Database size={20} color="#49A3C4" style={{ flexShrink: 0 }} />
+                        <h3 style={{
+                          fontSize: '16px',
+                          fontWeight: '600',
                           color: '#00364A',
-                          opacity: 0.5,
-                          transition: 'opacity 0.2s',
-                          padding: '5px',
-                          flexShrink: 0
-                        }}
-                        onMouseEnter={(e) => e.target.style.opacity = '1'}
-                        onMouseLeave={(e) => e.target.style.opacity = '0.5'}
-                      >
-                        {expandedEntity === entity.name ? <ChevronDown size={24} /> : <ChevronRight size={24} />}
-                      </button>
-                      <div style={{ minWidth: 0 }}>
-                        <h3 style={{ 
-                          fontSize: '18px', 
-                          fontWeight: '700', 
-                          color: '#00364A', 
                           margin: 0,
                           whiteSpace: 'nowrap',
                           overflow: 'hidden',
@@ -585,204 +748,349 @@ const EntityList = () => {
                         }}>
                           {entity.name}
                         </h3>
-                        <div style={{ display: 'flex', alignItems: 'center', fontSize: '13px', color: '#00364A', opacity: 0.6, marginTop: '5px' }}>
-                          <Columns size={14} style={{ marginRight: '5px', flexShrink: 0 }} />
-                          <span style={{ marginRight: '15px', whiteSpace: 'nowrap' }}>{entity.columns?.length || 0} columns</span>
-                          <span style={{ whiteSpace: 'nowrap' }}>{entity.row_count || 0} rows</span>
-                        </div>
+                      </div>
+
+                      <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
+                        <IconButton
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigate(`/entity-data?entity=${entity.name}`);
+                          }}
+                          icon={<Eye size={16} />}
+                          color="#8B5CF6"
+                          title="View Entity Data"
+                        />
+                        <IconButton
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (expandedEntity !== entity.name) {
+                              setExpandedEntity(entity.name);
+                            }
+                            setTimeout(() => {
+                              if (entityDetails && entityDetails.name === entity.name) {
+                                startEditing(entityDetails);
+                              }
+                            }, 100);
+                          }}
+                          icon={<Edit3 size={16} />}
+                          color="#49A3C4"
+                          title="Edit Entity"
+                        />
+                        <IconButton
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            deleteEntity(entity.name);
+                          }}
+                          icon={<Trash2 size={16} />}
+                          color="#EF4444"
+                          title="Delete Entity"
+                        />
                       </div>
                     </div>
 
-                    {/* Right: Actions */}
-                    <div style={{ display: 'flex', gap: '10px', flexShrink: 0 }}>
-                      <IconButton 
-                        onClick={() => startEditing(entity)} 
-                        icon={<Edit3 size={18} />} 
-                        color="#49A3C4" 
-                        title="Edit Entity"
-                      />
-                      <IconButton 
-                        onClick={() => deleteEntity(entity.name)} 
-                        icon={<Trash2 size={18} />} 
-                        color="#EF4444" 
-                        title="Delete Entity"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Expanded Content (Attributes) */}
-                  {expandedEntity === entity.name && (
-                    <div style={{
-                      borderTop: '1px solid rgba(0, 54, 74, 0.1)',
-                      padding: '25px',
-                      backgroundColor: '#F8FBFF'
-                    }}>
-                      <h4 style={{
-                        fontSize: '16px',
-                        fontWeight: '700',
-                        color: '#00364A',
-                        marginBottom: '20px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '10px'
+                    {/* Expanded Content */}
+                    {expandedEntity === entity.name && (
+                      <div style={{
+                        borderTop: '1px solid rgba(0, 54, 74, 0.08)',
+                        padding: '20px',
+                        backgroundColor: '#F8FBFF'
                       }}>
-                        <div style={{
-                          padding: '6px',
-                          backgroundColor: 'rgba(73, 163, 196, 0.15)',
-                          borderRadius: '8px',
-                          display: 'flex'
-                        }}>
-                          <Columns size={16} color="#49A3C4" />
-                        </div>
-                        Attributes
-                      </h4>
-                      
-                      {editingEntity === entity.name ? (
-                        /* Editing Mode */
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-                          {editAttributes.map((attr, index) => (
-                            <div key={index} style={{
-                              padding: '20px',
-                              borderRadius: '15px',
-                              backgroundColor: attr.action === 'remove' ? '#FEF2F2' : 'white',
-                              border: `1px solid ${attr.action === 'remove' ? '#FCA5A5' : 'rgba(0, 54, 74, 0.1)'}`
+                        {entityDetails ? (
+                          <>
+                            <div style={{ 
+                              display: 'flex', 
+                              alignItems: 'center', 
+                              gap: '12px', 
+                              marginBottom: '16px' 
                             }}>
-                              {attr.action === 'remove' ? (
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                  <span style={{ color: '#991B1B', fontWeight: '600' }}>
-                                    Column '{attr.originalName}' will be deleted
-                                  </span>
-                                  <button
-                                    onClick={() => undoRemove(index)}
-                                    style={{
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      gap: '5px',
-                                      padding: '8px 16px',
-                                      backgroundColor: '#FECACA',
-                                      color: '#991B1B',
-                                      border: 'none',
-                                      borderRadius: '10px',
-                                      fontSize: '13px',
-                                      fontWeight: '600',
-                                      cursor: 'pointer'
-                                    }}
-                                  >
-                                    <Undo size={14} /> Undo
-                                  </button>
-                                </div>
-                              ) : (
-                                <div style={{ display: 'grid', gridTemplateColumns: '2fr 1.5fr 1fr 0.5fr', gap: '20px', alignItems: 'start' }}>
-                                  <div>
-                                    <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#00364A', marginBottom: '5px' }}>Name</label>
-                                    <input
-                                      type="text"
-                                      value={attr.name}
-                                      onChange={(e) => updateAttribute(index, "name", e.target.value)}
-                                      style={inputStyle}
-                                    />
-                                    {attr.action === 'rename' && <p style={{ fontSize: '11px', color: '#49A3C4', marginTop: '4px' }}>Renaming from '{attr.originalName}'</p>}
-                                    {attr.action === 'add' && <p style={{ fontSize: '11px', color: '#059669', marginTop: '4px' }}>New column</p>}
-                                  </div>
-                                  <div>
-                                    <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#00364A', marginBottom: '5px' }}>Type</label>
-                                    <select
-                                      value={attr.datatype}
-                                      onChange={(e) => updateAttribute(index, "datatype", e.target.value)}
-                                      style={inputStyle}
-                                    >
-                                      <option value="text">String</option>
-                                      <option value="int">Integer</option>
-                                      <option value="bool">Boolean</option>
-                                      <option value="float">Float</option>
-                                      <option value="datetime">Date/Time</option>
-                                    </select>
-                                  </div>
-                                  <div>
-                                    <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#00364A', marginBottom: '5px' }}>Constraint</label>
-                                    <select
-                                      value={attr.nullable}
-                                      onChange={(e) => updateAttribute(index, "nullable", e.target.value)}
-                                      style={inputStyle}
-                                    >
-                                      <option value="optional">Optional</option>
-                                      <option value="required">Required</option>
-                                    </select>
-                                  </div>
-                                  <div style={{ display: 'flex', alignItems: 'end', height: '100%', paddingBottom: '2px' }}>
-                                    <IconButton 
-                                      onClick={() => removeAttribute(index)} 
-                                      icon={<Trash2 size={16} />} 
-                                      color="#EF4444" 
-                                      title="Remove"
-                                    />
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-                          ))}
-                          
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '20px' }}>
-                            <StyledButton onClick={addAttribute} icon={<Plus size={16} />}>Add Attribute</StyledButton>
-                            <div style={{ display: 'flex', gap: '10px' }}>
-                              <StyledButton onClick={saveChanges} variant="success" icon={<Save size={16} />}>Save Changes</StyledButton>
-                              <StyledButton onClick={cancelEditing} variant="secondary" icon={<X size={16} />}>Cancel</StyledButton>
-                            </div>
-                          </div>
-                        </div>
-                      ) : (
-                        /* View Mode */
-                        <div>
-                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: '15px' }}>
-                            {entity.columns?.map((column) => (
-                              <div key={column.name} style={{
-                                backgroundColor: 'white',
-                                padding: '15px',
-                                borderRadius: '12px',
-                                border: '1px solid rgba(0, 54, 74, 0.1)',
-                                display: 'flex',
-                                justifyContent: 'space-between',
-                                alignItems: 'center'
+                              <Columns size={16} color="#49A3C4" />
+                              <span style={{ 
+                                fontSize: '14px', 
+                                fontWeight: '600', 
+                                color: '#00364A' 
                               }}>
-                                <div>
-                                  <div style={{ display: 'flex', alignItems: 'center', marginBottom: '4px' }}>
-                                    <Type size={14} color="#49A3C4" style={{ marginRight: '8px' }} />
-                                    <span style={{ fontWeight: '600', color: '#00364A' }}>{column.name}</span>
+                                Attributes ({entityDetails.columns?.length || 0})
+                              </span>
+                              <span style={{ 
+                                fontSize: '13px', 
+                                color: '#00364A', 
+                                opacity: 0.6 
+                              }}>
+                                • {entityDetails.row_count || 0} rows
+                              </span>
+                            </div>
+
+                            {editingEntity === entity.name ? (
+                              /* Editing Mode */
+                              <div>
+                                {editAttributes.map((attr, index) => (
+                                  <div key={index} style={{
+                                    padding: '16px',
+                                    marginBottom: '12px',
+                                    borderRadius: '12px',
+                                    backgroundColor: attr.action === 'remove' ? '#FEF2F2' : 'white',
+                                    border: `1px solid ${attr.action === 'remove' ? '#FCA5A5' : 'rgba(0, 54, 74, 0.1)'}`
+                                  }}>
+                                    {attr.action === 'remove' ? (
+                                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                        <span style={{ color: '#991B1B', fontSize: '14px', fontWeight: '500' }}>
+                                          Column '{attr.originalName}' will be deleted
+                                        </span>
+                                        <button
+                                          onClick={() => undoRemove(index)}
+                                          style={{
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '6px',
+                                            padding: '6px 12px',
+                                            backgroundColor: '#FECACA',
+                                            color: '#991B1B',
+                                            border: 'none',
+                                            borderRadius: '6px',
+                                            fontSize: '12px',
+                                            fontWeight: '600',
+                                            cursor: 'pointer'
+                                          }}
+                                        >
+                                          <Undo size={14} /> Undo
+                                        </button>
+                                      </div>
+                                    ) : (
+                                      <div style={{ 
+                                        display: 'grid', 
+                                        gridTemplateColumns: '2fr 1.5fr 1fr auto', 
+                                        gap: '16px', 
+                                        alignItems: 'start' 
+                                      }}>
+                                        <div>
+                                          <label style={{ fontSize: '12px', fontWeight: '600', color: '#00364A', marginBottom: '4px', display: 'block' }}>Name</label>
+                                          <input
+                                            type="text"
+                                            value={attr.name}
+                                            onChange={(e) => updateAttribute(index, "name", e.target.value)}
+                                            style={inputStyle}
+                                          />
+                                          {attr.action === 'rename' && (
+                                            <p style={{ fontSize: '11px', color: '#49A3C4', marginTop: '4px' }}>
+                                              Renaming from '{attr.originalName}'
+                                            </p>
+                                          )}
+                                        </div>
+                                        <div>
+                                          <label style={{ fontSize: '12px', fontWeight: '600', color: '#00364A', marginBottom: '4px', display: 'block' }}>Type</label>
+                                          <select
+                                            value={attr.datatype}
+                                            onChange={(e) => updateAttribute(index, "datatype", e.target.value)}
+                                            style={inputStyle}
+                                          >
+                                            <option value="text">String</option>
+                                            <option value="int">Integer</option>
+                                            <option value="bool">Boolean</option>
+                                            <option value="float">Float</option>
+                                            <option value="datetime">Date/Time</option>
+                                          </select>
+                                        </div>
+                                        <div>
+                                          <label style={{ fontSize: '12px', fontWeight: '600', color: '#00364A', marginBottom: '4px', display: 'block' }}>Constraint</label>
+                                          <select
+                                            value={attr.nullable}
+                                            onChange={(e) => updateAttribute(index, "nullable", e.target.value)}
+                                            style={inputStyle}
+                                          >
+                                            <option value="optional">Optional</option>
+                                            <option value="required">Required</option>
+                                          </select>
+                                        </div>
+                                        <div style={{ display: 'flex', alignItems: 'center', height: '100%', marginTop: '20px' }}>
+                                          <IconButton
+                                            onClick={() => removeAttribute(index)}
+                                            icon={<Trash2 size={14} />}
+                                            color="#EF4444"
+                                            title="Remove"
+                                          />
+                                        </div>
+                                      </div>
+                                    )}
                                   </div>
-                                  <span style={{ fontSize: '12px', color: '#00364A', opacity: 0.6, marginLeft: '22px' }}>{column.type}</span>
-                                </div>
-                                <span style={{
-                                  fontSize: '11px',
-                                  fontWeight: '700',
-                                  padding: '4px 10px',
-                                  borderRadius: '10px',
-                                  backgroundColor: column.nullable === 'NO' ? '#FEE2E2' : '#ECFDF5',
-                                  color: column.nullable === 'NO' ? '#991B1B' : '#065F46',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  gap: '4px'
+                                ))}
+
+                                <div style={{ 
+                                  display: 'flex', 
+                                  justifyContent: 'space-between', 
+                                  alignItems: 'center', 
+                                  marginTop: '16px' 
                                 }}>
-                                  <Shield size={10} />
-                                  {column.nullable === 'NO' ? 'Required' : 'Optional'}
-                                </span>
+                                  <StyledButton onClick={addAttribute} icon={<Plus size={14} />} size="small">
+                                    Add Attribute
+                                  </StyledButton>
+                                  <div style={{ display: 'flex', gap: '8px' }}>
+                                    <StyledButton onClick={saveChanges} variant="success" icon={<Save size={14} />} size="small">
+                                      Save
+                                    </StyledButton>
+                                    <StyledButton onClick={cancelEditing} variant="secondary" icon={<X size={14} />} size="small">
+                                      Cancel
+                                    </StyledButton>
+                                  </div>
+                                </div>
                               </div>
-                            ))}
+                            ) : (
+                              /* View Mode */
+                              <div>
+                                <div style={{ 
+                                  display: 'grid', 
+                                  gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', 
+                                  gap: '12px',
+                                  marginBottom: '16px'
+                                }}>
+                                  {entityDetails.columns?.filter(col => col.name !== 'modified_at').map((column) => (
+                                    <div key={column.name} style={{
+                                      backgroundColor: 'white',
+                                      padding: '12px',
+                                      borderRadius: '10px',
+                                      border: '1px solid rgba(0, 54, 74, 0.08)',
+                                      display: 'flex',
+                                      justifyContent: 'space-between',
+                                      alignItems: 'center'
+                                    }}>
+                                      <div>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
+                                          <Type size={12} color="#49A3C4" />
+                                          <span style={{ fontSize: '13px', fontWeight: '600', color: '#00364A' }}>{column.name}</span>
+                                        </div>
+                                        <span style={{ fontSize: '11px', color: '#00364A', opacity: 0.5, marginLeft: '18px' }}>
+                                          {column.type}
+                                        </span>
+                                      </div>
+                                      <span style={{
+                                        fontSize: '10px',
+                                        fontWeight: '600',
+                                        padding: '3px 8px',
+                                        borderRadius: '12px',
+                                        backgroundColor: column.nullable === 'NO' ? '#FEE2E2' : '#ECFDF5',
+                                        color: column.nullable === 'NO' ? '#991B1B' : '#065F46'
+                                      }}>
+                                        {column.nullable === 'NO' ? 'Required' : 'Optional'}
+                                      </span>
+                                    </div>
+                                  ))}
+                                </div>
+
+                                <StyledButton 
+                                  onClick={() => startEditing(entityDetails)} 
+                                  icon={<Edit3 size={14} />}
+                                  size="small"
+                                >
+                                  Edit Entity
+                                </StyledButton>
+                              </div>
+                            )}
+                          </>
+                        ) : (
+                          <div style={{ display: 'flex', justifyContent: 'center', padding: '20px' }}>
+                            <Loader2 size={20} className="spin" style={{ color: '#49A3C4' }} />
                           </div>
-                          
-                          <div style={{ marginTop: '25px' }}>
-                            <StyledButton onClick={() => startEditing(entity)} icon={<Edit3 size={16} />}>Edit Entity</StyledButton>
-                          </div>
-                        </div>
-                      )}
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              {/* Pagination Controls */}
+              {totalPages > 1 && (
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  paddingTop: '20px',
+                  borderTop: '1px solid rgba(0, 54, 74, 0.1)'
+                }}>
+                  <div style={{ fontSize: '13px', color: '#00364A', opacity: 0.6 }}>
+                    Showing {(currentPage - 1) * pageSize + 1} to {Math.min(currentPage * pageSize, totalEntities)} of {totalEntities} entities
+                  </div>
+                  
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <PaginationButton
+                      onClick={handlePreviousPage}
+                      disabled={currentPage === 1 || isFetchingEntities}
+                      icon={navigatingDirection === 'prev' ? <Loader2 size={16} className="spin" /> : <ChevronLeft size={16} />}
+                    >
+                      Previous
+                    </PaginationButton>
+                    
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px'
+                    }}>
+                      {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                        let pageNum;
+                        if (totalPages <= 5) {
+                          pageNum = i + 1;
+                        } else if (currentPage <= 3) {
+                          pageNum = i + 1;
+                        } else if (currentPage >= totalPages - 2) {
+                          pageNum = totalPages - 4 + i;
+                        } else {
+                          pageNum = currentPage - 2 + i;
+                        }
+                        
+                        return (
+                          <button
+                            key={pageNum}
+                            onClick={() => {
+                              setNavigatingDirection('page');
+                              setCurrentPage(pageNum);
+                              setExpandedEntity(null);
+                              setEditingEntity(null);
+                            }}
+                            disabled={isFetchingEntities}
+                            style={{
+                              width: '36px',
+                              height: '36px',
+                              borderRadius: '8px',
+                              border: 'none',
+                              backgroundColor: currentPage === pageNum ? '#00364A' : 'transparent',
+                              color: currentPage === pageNum ? 'white' : '#00364A',
+                              fontWeight: '600',
+                              fontSize: '14px',
+                              cursor: isFetchingEntities ? 'not-allowed' : 'pointer',
+                              transition: 'all 0.2s',
+                              opacity: isFetchingEntities ? 0.5 : 1
+                            }}
+                            onMouseEnter={(e) => {
+                              if (!isFetchingEntities && currentPage !== pageNum) {
+                                e.target.style.backgroundColor = 'rgba(0, 54, 74, 0.05)';
+                              }
+                            }}
+                            onMouseLeave={(e) => {
+                              if (currentPage !== pageNum) {
+                                e.target.style.backgroundColor = 'transparent';
+                              }
+                            }}
+                          >
+                            {pageNum}
+                          </button>
+                        );
+                      })}
                     </div>
-                  )}
+                    
+                    <PaginationButton
+                      onClick={handleNextPage}
+                      disabled={currentPage === totalPages || isFetchingEntities}
+                      icon={navigatingDirection === 'next' ? <Loader2 size={16} className="spin" /> : <ChevronRightIcon2 size={16} />}
+                      iconPos="right"
+                    >
+                      Next
+                    </PaginationButton>
+                  </div>
                 </div>
-              ))}
-            </div>
+              )}
+            </>
           )}
         </div>
       </div>
-    </div>
+    </Layout>
   );
 };
 
@@ -790,16 +1098,14 @@ const EntityList = () => {
 
 const IconButton = ({ onClick, icon, color, disabled, title }) => {
   const [hover, setHover] = useState(false);
-  
-  // Use a hex code to ensure background opacity logic works
+
   const effectiveColor = disabled ? '#cccccc' : color;
-  
+
   const getBgColor = () => {
     if (disabled) return '#f5f5f5';
-    // If hovering, add transparency to hex color, or fallback to gray
     if (hover) {
-        if (effectiveColor.startsWith('#')) return `${effectiveColor}15`; 
-        return '#f0f0f0';
+      if (effectiveColor.startsWith('#')) return `${effectiveColor}15`;
+      return '#f0f0f0';
     }
     return '#F8FBFF';
   };
@@ -812,13 +1118,13 @@ const IconButton = ({ onClick, icon, color, disabled, title }) => {
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
       style={{
-        width: '40px',
-        minWidth: '40px',
-        height: '40px',
-        borderRadius: '10px',
+        width: '34px',
+        minWidth: '34px',
+        height: '34px',
+        borderRadius: '8px',
         border: `1px solid ${disabled ? '#eee' : 'rgba(0,54,74,0.1)'}`,
         backgroundColor: getBgColor(),
-        color: effectiveColor, // This text color is inherited by the Icon via currentColor
+        color: effectiveColor,
         cursor: disabled ? 'not-allowed' : 'pointer',
         display: 'flex',
         alignItems: 'center',
@@ -828,24 +1134,32 @@ const IconButton = ({ onClick, icon, color, disabled, title }) => {
         padding: 0
       }}
     >
-      {/* Icon renders here, inheriting text color */}
       {icon}
     </button>
   );
 };
-const StyledButton = ({ onClick, icon, children, variant = 'primary' }) => {
+
+const StyledButton = ({ onClick, icon, children, variant = 'primary', size = 'medium' }) => {
   const [hover, setHover] = useState(false);
-  
+
+  const sizeStyles = {
+    small: { padding: '8px 16px', fontSize: '13px' },
+    medium: { padding: '10px 20px', fontSize: '14px' }
+  };
+
   let bg = '#00364A';
   let color = 'white';
   let border = 'none';
+  let hoverBg = '#004e66';
 
   if (variant === 'secondary') {
     bg = 'white';
     color = '#00364A';
     border = '1px solid rgba(0, 54, 74, 0.2)';
+    hoverBg = '#F3F4F6';
   } else if (variant === 'success') {
     bg = '#059669';
+    hoverBg = '#047857';
   }
 
   return (
@@ -854,18 +1168,49 @@ const StyledButton = ({ onClick, icon, children, variant = 'primary' }) => {
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
       style={{
-        display: 'flex',
+        display: 'inline-flex',
         alignItems: 'center',
-        gap: '8px',
-        padding: '10px 20px',
-        backgroundColor: hover ? (variant === 'secondary' ? '#F3F4F6' : (variant === 'success' ? '#047857' : '#004e66')) : bg,
+        gap: '6px',
+        padding: sizeStyles[size].padding,
+        backgroundColor: hover ? hoverBg : bg,
         color: color,
         border: border,
-        borderRadius: '10px',
+        borderRadius: '8px',
         fontWeight: '600',
-        fontSize: '14px',
+        fontSize: sizeStyles[size].fontSize,
         cursor: 'pointer',
-        transition: 'all 0.3s'
+        transition: 'all 0.2s'
+      }}
+    >
+      {icon}
+      {children}
+    </button>
+  );
+};
+
+const PaginationButton = ({ onClick, disabled, icon, children, iconPos = "left" }) => {
+  const [hover, setHover] = useState(false);
+  
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: '6px',
+        padding: '8px 16px',
+        backgroundColor: hover && !disabled ? '#F0F4F8' : 'white',
+        color: disabled ? '#A0AEC0' : '#00364A',
+        border: `1px solid ${disabled ? '#E2E8F0' : 'rgba(0, 54, 74, 0.2)'}`,
+        borderRadius: '8px',
+        fontWeight: '500',
+        fontSize: '13px',
+        cursor: disabled ? 'not-allowed' : 'pointer',
+        transition: 'all 0.2s',
+        flexDirection: iconPos === 'right' ? 'row-reverse' : 'row'
       }}
     >
       {icon}
@@ -876,12 +1221,12 @@ const StyledButton = ({ onClick, icon, children, variant = 'primary' }) => {
 
 const inputStyle = {
   width: '100%',
-  padding: '10px 14px',
-  borderRadius: '8px',
+  padding: '8px 12px',
+  borderRadius: '6px',
   border: '1px solid rgba(0, 54, 74, 0.15)',
   backgroundColor: 'white',
   color: '#00364A',
-  fontSize: '14px',
+  fontSize: '13px',
   outline: 'none',
   boxSizing: 'border-box'
 };

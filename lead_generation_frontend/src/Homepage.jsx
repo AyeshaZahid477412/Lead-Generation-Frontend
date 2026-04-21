@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Globe, Magnet, Clock, LucideHammer, Target, BarChart2, Link2, Bot, Zap, Search, Database, Settings, Cloud, Activity, Layers, Bug, Network } from 'lucide-react';
+import Header from './components/Header';
 // import { Target, BarChart2, Link2 } from 'lucide-react';
 // import { Globe, Zap } from 'lucide-react';
 
@@ -70,240 +71,7 @@ export default function WebScraperLanding() {
       color: '#00364A',
       fontFamily: "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif"
     }}>
-      {/* Header */}
-      <header style={{
-        display: 'flex',
-        justifyContent: 'center',
-        alignItems: 'center',
-        padding: '20px 60px',
-        position: 'relative',
-        zIndex: 50
-      }}>
-        <div style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          backgroundColor: 'white',
-          borderRadius: '20px',
-          padding: '12px 40px',
-          boxShadow: '0 4px 20px rgba(0, 54, 74, 0.1)',
-          width: '100%',
-          maxWidth: '1400px'
-        }}>
-          
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '10px',
-            fontSize: '20px',
-            fontWeight: 'bold',
-            color: '#00364A'
-          }}
-          onMouseEnter={(e) => {
-          e.currentTarget.style.transform = 'scale(1.03)';
-          }}
-          onMouseLeave={(e) => {
-          e.currentTarget.style.transform = 'scale(1)';
-          }}
-          >
-            {/* <div style={{ position: 'relative', width: '24px', height: '24px' }}>
-              <Globe size={24} strokeWidth={2} style={{ position: 'absolute', top: 0, left: 0 }} />
-              <Zap size={16} strokeWidth={2} style={{ position: 'absolute', top: 4, left: 4 }} />
-            </div>
-            SCOUT
-          </div> */}
-          <div style={{ position: 'relative', width: '40px', height: '24px' }}>
-             <Layers size={50} strokeWidth={2} style={{ position: 'absolute', top:-14, left: -5 }} />
-             <Activity size={30} strokeWidth={2} style={{ position: 'absolute', top: -2, left: 6 }} />
-
-            </div>
-            SCOUT
-          </div>
-          {/* <div style={{ position: 'relative', width: '40px', height: '24px' }}>
-             <Globe size={40} strokeWidth={2} style={{ position: 'absolute', top:-10, left: -5 }} />
-             <Bot size={30} strokeWidth={2} style={{ position: 'absolute', top: -2, left: 6 }} />
-
-            </div>
-            SCOUT
-          </div>  */}
-          {/* <div style={{ position: 'relative', width: '40px', height: '24px' }}>
-             <Database size={50} strokeWidth={2} style={{ position: 'absolute', top:-14, left: -5 }} />
-             <Search size={30} strokeWidth={2} style={{ position: 'absolute', top: -2, left: 6 }} />
-
-            </div>
-            SCOUT
-          </div>  */}
-          {/* <div style={{ position: 'relative', width: '40px', height: '24px' }}>
-             <Cloud  size={50} strokeWidth={2} style={{ position: 'absolute', top:-14, left: -5 }} />
-             <Settings size={30} strokeWidth={2} style={{ position: 'absolute', top: -2, left: 6 }} />
-
-            </div>
-            SCOUT
-          </div>  */}
-          
-
-          
-          {/* Navigation Links - Center */}
-          <nav style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '30px',
-            position: 'absolute',
-            left: '50%',
-            transform: 'translateX(-50%)'
-          }}>
-            <a 
-              href="#home" 
-              onClick={(e) => {
-                e.preventDefault();
-                setActivePage('home');
-                scrollToSection('home');
-              }}
-              style={{
-                fontWeight: '500',
-                color: '#00364A',
-                textDecoration: 'none',
-                transition: 'all 0.3s',
-                padding: '8px 20px',
-                borderRadius: '10px',
-                backgroundColor: activePage === 'home' ? '#00364A' : 'transparent',
-                color: activePage === 'home' ? 'white' : '#00364A'
-              }}
-              onMouseEnter={(e) => {
-                if (activePage !== 'home') {
-                  e.target.style.opacity = '0.6';
-                }
-              }}
-              onMouseLeave={(e) => {
-                e.target.style.opacity = '1';
-              }}>
-              Home
-            </a>
-            <a 
-              href="#about" 
-              onClick={(e) => {
-                e.preventDefault();
-                setActivePage('about');
-                scrollToSection('about');
-              }}
-              style={{
-                fontWeight: '500',
-                color: '#00364A',
-                textDecoration: 'none',
-                transition: 'all 0.3s',
-                padding: '8px 20px',
-                borderRadius: '10px',
-                backgroundColor: activePage === 'about' ? '#00364A' : 'transparent',
-                color: activePage === 'about' ? 'white' : '#00364A'
-              }}
-              onMouseEnter={(e) => {
-                if (activePage !== 'about') {
-                  e.target.style.opacity = '0.6';
-                }
-              }}
-              onMouseLeave={(e) => {
-                e.target.style.opacity = '1';
-              }}>
-              About Us
-            </a>
-            <a 
-              href="#pricing" 
-              onClick={(e) => {
-                e.preventDefault();
-                setActivePage('pricing');
-                scrollToSection('pricing');
-              }}
-              style={{
-                fontWeight: '500',
-                color: '#00364A',
-                textDecoration: 'none',
-                transition: 'all 0.3s',
-                padding: '8px 20px',
-                borderRadius: '10px',
-                backgroundColor: activePage === 'pricing' ? '#00364A' : 'transparent',
-                color: activePage === 'pricing' ? 'white' : '#00364A'
-              }}
-              onMouseEnter={(e) => {
-                if (activePage !== 'pricing') {
-                  e.target.style.opacity = '0.6';
-                }
-              }}
-              onMouseLeave={(e) => {
-                e.target.style.opacity = '1';
-              }}>
-              Pricing
-            </a>
-          </nav>
-          
-          {/* Buttons - Right */}
-          <div style={{ display: 'flex', gap: '15px' }}>
-            <button 
-              onClick={() => navigate('/login')} // Navigates to the route defined in App.js
-              style={{
-                padding: '10px 28px',
-                backgroundColor: '#49A3C4',
-                color: 'white',
-                border: '2px solid #49A3C4', // Added explicit border for hover consistency
-                borderRadius: '12px',
-                fontWeight: '600',
-                cursor: 'pointer',
-                transition: 'all 0.3s',
-                fontSize: '15px',
-                fontFamily: 'inherit' // Ensures font matches
-              }}
-              onMouseEnter={(e) => {
-                e.target.style.backgroundColor = 'white';
-                e.target.style.color = '#49A3C4';
-                e.target.style.border = '2px solid #49A3C4';
-                e.target.style.transform = 'translateY(-2px)';
-                e.target.style.boxShadow = '0 4px 12px rgba(73, 163, 196, 0.3)';
-              }}
-              onMouseLeave={(e) => {
-                e.target.style.backgroundColor = '#49A3C4';
-                e.target.style.color = 'white';
-                e.target.style.border = '2px solid #49A3C4';
-                e.target.style.transform = 'translateY(0)';
-                e.target.style.boxShadow = 'none';
-              }}
-            >
-              Login
-            </button>
-            <button style={{
-              padding: '10px 28px',
-              backgroundColor: '#00364A',
-              color: 'white',
-              border: 'none',
-              borderRadius: '12px',
-              fontWeight: '600',
-              cursor: 'pointer',
-              transition: 'all 0.3s',
-              fontSize: '15px'
-            }}
-            onClick={() => {
-                document.getElementById('contact us')?.scrollIntoView({
-                behavior: 'smooth',
-                block: 'start'
-              });
-            }}
-            onMouseEnter={(e) => {
-              e.target.style.backgroundColor = 'white';
-              e.target.style.color = '#00364A';
-              e.target.style.border = '2px solid #00364A';
-              e.target.style.transform = 'translateY(-2px)';
-              e.target.style.boxShadow = '0 4px 12px rgba(0, 54, 74, 0.3)';
-            }}
-            onMouseLeave={(e) => {
-              e.target.style.backgroundColor = '#00364A';
-              e.target.style.color = 'white';
-              e.target.style.border = 'none';
-              e.target.style.transform = 'translateY(0)';
-              e.target.style.boxShadow = 'none';
-            }}>
-              Contact Us
-            </button>
-          </div>
-        </div>
-      </header>
+      <Header activeTab={activePage} />
 
       {/* Hero Section */}
       <section id="home" style={{
@@ -343,9 +111,9 @@ export default function WebScraperLanding() {
             color: '#00364A',
             textAlign: 'left'
           }}>
-            POWERFUL WEB SCRAPER FOR REGULAR AND PROFESSIONAL USE
+            POWERFUL CUSTOMIZED WEB SCRAPER FOR LEAD GENERATION
           </h1>
-          
+
           <p style={{
             fontSize: '20px',
             marginBottom: '10px',
@@ -355,7 +123,7 @@ export default function WebScraperLanding() {
           }}>
             Automate data extraction in <span style={{ color: '#49A3C4', fontWeight: '600' }}>20 minutes</span>
           </p>
-          
+
           <p style={{
             fontSize: '18px',
             lineHeight: '1.7',
@@ -364,7 +132,7 @@ export default function WebScraperLanding() {
             opacity: 0.85,
             textAlign: 'left'
           }}>
-            Web Scraper is designed for regular and scheduled use to extract large amounts of data and easily integrate with other systems.
+            Web Scraper is designed for Lead Generation and Data Extraction to extract large amounts of data and easily integrate with other systems.
           </p>
 
           {/* CTA Buttons */}
@@ -384,21 +152,21 @@ export default function WebScraperLanding() {
               cursor: 'pointer',
               transition: 'all 0.3s'
             }}
-            onClick = {() => navigate('/quick-extract')}
-            onMouseEnter={(e) => {
-              e.target.style.backgroundColor = 'white';
-              e.target.style.color = '#00364A';
-              e.target.style.border = '2px solid #00364A';
-              e.target.style.transform = 'translateY(-3px)';
-              e.target.style.boxShadow = '0 8px 25px rgba(0, 54, 74, 0.3)';
-            }}
-            onMouseLeave={(e) => {
-              e.target.style.backgroundColor = '#00364A';
-              e.target.style.color = 'white';
-              e.target.style.border = 'none';
-              e.target.style.transform = 'translateY(0)';
-              e.target.style.boxShadow = 'none';
-            }}>
+              onClick={() => navigate('/quick-extract')}
+              onMouseEnter={(e) => {
+                e.target.style.backgroundColor = 'white';
+                e.target.style.color = '#00364A';
+                e.target.style.border = '2px solid #00364A';
+                e.target.style.transform = 'translateY(-3px)';
+                e.target.style.boxShadow = '0 8px 25px rgba(0, 54, 74, 0.3)';
+              }}
+              onMouseLeave={(e) => {
+                e.target.style.backgroundColor = '#00364A';
+                e.target.style.color = 'white';
+                e.target.style.border = 'none';
+                e.target.style.transform = 'translateY(0)';
+                e.target.style.boxShadow = 'none';
+              }}>
               Get started for free
             </button>
             <button style={{
@@ -415,18 +183,18 @@ export default function WebScraperLanding() {
               alignItems: 'center',
               gap: '10px'
             }}
-            onMouseEnter={(e) => {
-              e.target.style.backgroundColor = '#00364A';
-              e.target.style.color = 'white';
-              e.target.style.transform = 'translateY(-3px)';
-              e.target.style.boxShadow = '0 8px 25px rgba(0, 54, 74, 0.2)';
-            }}
-            onMouseLeave={(e) => {
-              e.target.style.backgroundColor = 'white';
-              e.target.style.color = '#00364A';
-              e.target.style.transform = 'translateY(0)';
-              e.target.style.boxShadow = 'none';
-            }}>
+              onMouseEnter={(e) => {
+                e.target.style.backgroundColor = '#00364A';
+                e.target.style.color = 'white';
+                e.target.style.transform = 'translateY(-3px)';
+                e.target.style.boxShadow = '0 8px 25px rgba(0, 54, 74, 0.2)';
+              }}
+              onMouseLeave={(e) => {
+                e.target.style.backgroundColor = 'white';
+                e.target.style.color = '#00364A';
+                e.target.style.transform = 'translateY(0)';
+                e.target.style.boxShadow = 'none';
+              }}>
               <span style={{ fontSize: '20px' }}>✨</span> How it works
             </button>
           </div>
@@ -462,7 +230,7 @@ export default function WebScraperLanding() {
                 e.target.style.boxShadow = 'none';
               }}
             />
-            <button 
+            <button
               onClick={handleTryNow}
               style={{
                 padding: '18px 40px',
@@ -506,8 +274,8 @@ export default function WebScraperLanding() {
         </div>
       </section>
 
-    
-        {/* Use Cases Section */}
+
+      {/* Use Cases Section */}
       <section style={{
         padding: '80px 60px',
         backgroundColor: '#E0EFFF'
@@ -542,74 +310,74 @@ export default function WebScraperLanding() {
           </h2>
         </div>
 
-          {/* Cards Grid */}
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
-            gap: '30px',
-            maxWidth: '1400px',
-            margin: '0 auto 60px'
-          }}>
-        
-          <UseCaseCard 
+        {/* Cards Grid */}
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+          gap: '30px',
+          maxWidth: '1400px',
+          margin: '0 auto 60px'
+        }}>
+
+          <UseCaseCard
             icon={<Globe size={28} color="#fff" />}
             title="Source & Data Extraction"
             description="Select from existing data sources or configure a new one to initiate structured data extraction. The system ensures secure and accurate retrieval, enabling efficient integration into downstream processes."
           />
 
-          <UseCaseCard 
+          <UseCaseCard
             icon={<Magnet size={28} color="#fff" />}
             title="Entity Extraction"
             description="Define specific entities within your data source and extract data only for them. This focused approach ensures precision, relevance, and reduces unnecessary processing."
           />
 
-          <UseCaseCard 
+          <UseCaseCard
             icon={<Clock size={28} color="#fff" />}
             title="Automated Scheduling"
             description="Configure extraction tasks for entities or entire sources and automate execution on a monthly, yearly, or custom schedule. Each task handles the complete scraping process for consistent, hands-free data collection."
           />
 
-          <UseCaseCard 
+          <UseCaseCard
             icon={<LucideHammer size={28} color="#fff" />}
             title="Customization & Support"
             description="Customize data fields, filters, and extraction logic to meet specific requirements. An integrated trained chatbot provides guidance, answers queries, and assists with troubleshooting."
           />
 
-          </div>         
-      
-          {/* Discord CTA */}
-          <div style={{
-            maxWidth: '900px',
-            margin: '0 auto',
-            backgroundColor: '#49A3C4',
-            borderRadius: '20px',
-            padding: '30px 40px',
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            boxShadow: '0 10px 40px rgba(73, 163, 196, 0.3)'
+        </div>
+
+        {/* Discord CTA */}
+        <div style={{
+          maxWidth: '900px',
+          margin: '0 auto',
+          backgroundColor: '#49A3C4',
+          borderRadius: '20px',
+          padding: '30px 40px',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          boxShadow: '0 10px 40px rgba(73, 163, 196, 0.3)'
+        }}>
+          <span style={{
+            color: 'white',
+            fontSize: '18px',
+            fontWeight: '600'
           }}>
-            <span style={{
-              color: 'white',
-              fontSize: '18px',
-              fontWeight: '600'
-            }}>
-              Explore More Use Cases. Join Our Discord Community!
-            </span>
-            <button style={{
-              padding: '12px 30px',
-              backgroundColor: 'white',
-              color: '#49A3C4',
-              border: 'none',
-              borderRadius: '10px',
-              fontWeight: '600',
-              fontSize: '15px',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              transition: 'all 0.3s'
-            }}
+            Explore More Use Cases. Join Our Discord Community!
+          </span>
+          <button style={{
+            padding: '12px 30px',
+            backgroundColor: 'white',
+            color: '#49A3C4',
+            border: 'none',
+            borderRadius: '10px',
+            fontWeight: '600',
+            fontSize: '15px',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            transition: 'all 0.3s'
+          }}
             onMouseEnter={(e) => {
               e.target.style.transform = 'translateY(-2px)';
               e.target.style.boxShadow = '0 6px 20px rgba(255, 255, 255, 0.3)';
@@ -618,11 +386,11 @@ export default function WebScraperLanding() {
               e.target.style.transform = 'translateY(0)';
               e.target.style.boxShadow = 'none';
             }}>
-              <span style={{ fontSize: '18px' }}>💬</span> Discord
-            </button>
-          </div>
-        </section>
-        
+            <span style={{ fontSize: '18px' }}>💬</span> Discord
+          </button>
+        </div>
+      </section>
+
 
       {/* How It Works Section */}
       <section style={{
@@ -665,22 +433,22 @@ export default function WebScraperLanding() {
               backgroundColor: '#49A3C4'
             }} />
 
-            <StepCard 
+            <StepCard
               number="1"
               title="Paste Website URL"
               bgColor="#7DBBE0"
             />
-            <StepCard 
+            <StepCard
               number="2"
               title="Fetch data"
               bgColor="#7DBBE0"
             />
-            <StepCard 
+            <StepCard
               number="3"
               title="Processing the page"
               bgColor="white"
             />
-            <StepCard 
+            <StepCard
               number="4"
               title="See results"
               bgColor="white"
@@ -728,32 +496,32 @@ export default function WebScraperLanding() {
             margin: '0 auto',
             padding: '0 40px'
           }}>
-            <FeatureCard 
+            <FeatureCard
               icon="📤"
               title="No coding required"
               description="Point and click to extract the data you need in minutes."
             />
-            <FeatureCard 
+            <FeatureCard
               icon="🔍"
               title="AI-powered monitoring"
               description="Keep your data up to date (and accurate) automatically."
             />
-            <FeatureCard 
+            <FeatureCard
               icon="🔧"
               title="Custom Built Scrapper"
               description="Built-in scrapper with custom data to make your work more easier"
             />
-            <FeatureCard 
+            <FeatureCard
               icon="💻"
               title="Extract data from any website"
               description="Built-in bot detection, proxy management, automatic retries, and rate limiting."
             />
-            <FeatureCard 
+            <FeatureCard
               icon="📊"
               title="Scale with confidence"
               description="Build on a platform designed for limitless scale."
             />
-            <FeatureCard 
+            <FeatureCard
               icon="💎"
               title="Managed services"
               description="Full-service implementation options for complex projects."
@@ -762,161 +530,161 @@ export default function WebScraperLanding() {
         </div>
       </section>
 
-      
+
       {/* Platform Features Section */}
-        <section id="about" style={{
-          padding: '100px 60px',
-          backgroundColor: '#E0EFFF'
+      <section id="about" style={{
+        padding: '100px 60px',
+        backgroundColor: '#E0EFFF'
+      }}>
+        <div style={{
+          maxWidth: '1200px',
+          margin: '0 auto'
         }}>
           <div style={{
-            maxWidth: '1200px',
-            margin: '0 auto'
+            backgroundColor: 'white',
+            borderRadius: '25px',
+            padding: '60px 50px',
+            border: '3px solid #00364A',
+            boxShadow: '0 15px 50px rgba(0, 54, 74, 0.1)'
           }}>
-            <div style={{
-              backgroundColor: 'white',
-              borderRadius: '25px',
-              padding: '60px 50px',
-              border: '3px solid #00364A',
-              boxShadow: '0 15px 50px rgba(0, 54, 74, 0.1)'
+            {/* Header */}
+            <h2 style={{
+              fontSize: '32px',
+              fontWeight: '800',
+              color: '#00364A',
+              marginBottom: '15px',
+              textAlign: 'left'
             }}>
-              {/* Header */}
-              <h2 style={{
-                fontSize: '32px',
-                fontWeight: '800',
-                color: '#00364A',
-                marginBottom: '15px',
-                textAlign: 'left'
-              }}>
-                The ultimate data extraction platform
-              </h2>
-              <p style={{
-                fontSize: '16px',
-                color: '#00364A',
-                opacity: 0.75,
-                marginBottom: '50px',
-                textAlign: 'left'
-              }}>
-                Reliable and scalable data scraping so you can unlock the data you need.
-              </p>
+              The ultimate data extraction platform
+            </h2>
+            <p style={{
+              fontSize: '16px',
+              color: '#00364A',
+              opacity: 0.75,
+              marginBottom: '50px',
+              textAlign: 'left'
+            }}>
+              Reliable and scalable data scraping so you can unlock the data you need.
+            </p>
 
-              {/* Three Columns */}
-              <div style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(3, 1fr)',
-                gap: '50px'
-              }}>
-                {/* Extract Column */}
-                <div>
+            {/* Three Columns */}
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(3, 1fr)',
+              gap: '50px'
+            }}>
+              {/* Extract Column */}
+              <div>
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '10px',
+                  marginBottom: '25px'
+                }}>
                   <div style={{
+                    width: '40px',
+                    height: '40px',
+                    backgroundColor: '#E0F2FE',
+                    borderRadius: '10px',
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '10px',
-                    marginBottom: '25px'
+                    justifyContent: 'center'
                   }}>
-                    <div style={{
-                      width: '40px',
-                      height: '40px',
-                      backgroundColor: '#E0F2FE',
-                      borderRadius: '10px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center'
-                    }}>
-                      <Target size={20} color="#00364A" />
-                    </div>
-                    <h3 style={{
-                      fontSize: '20px',
-                      fontWeight: '700',
-                      color: '#00364A',
-                      margin: 0
-                    }}>
-                      Extract
-                    </h3>
+                    <Target size={20} color="#00364A" />
                   </div>
-                  <FeatureList items={[
-                    'AI-powered point-and-click assistant',
-                    'Deep scraping',
-                    'Solves captchas',
-                    'Handles pagination',
-                    'Location-based data'
-                  ]} />
+                  <h3 style={{
+                    fontSize: '20px',
+                    fontWeight: '700',
+                    color: '#00364A',
+                    margin: 0
+                  }}>
+                    Extract
+                  </h3>
                 </div>
+                <FeatureList items={[
+                  'AI-powered point-and-click assistant',
+                  'Deep scraping',
+                  'Solves captchas',
+                  'Handles pagination',
+                  'Location-based data'
+                ]} />
+              </div>
 
-                {/* Monitor Column */}
-                <div>
+              {/* Monitor Column */}
+              <div>
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '10px',
+                  marginBottom: '25px'
+                }}>
                   <div style={{
+                    width: '40px',
+                    height: '40px',
+                    backgroundColor: '#E0F2FE',
+                    borderRadius: '10px',
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '10px',
-                    marginBottom: '25px'
+                    justifyContent: 'center'
                   }}>
-                    <div style={{
-                      width: '40px',
-                      height: '40px',
-                      backgroundColor: '#E0F2FE',
-                      borderRadius: '10px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center'
-                    }}>
-                      <BarChart2 size={20} color="#00364A" />
-                    </div>
-                    <h3 style={{
-                      fontSize: '20px',
-                      fontWeight: '700',
-                      color: '#00364A',
-                      margin: 0
-                    }}>
-                      Monitor
-                    </h3>
+                    <BarChart2 size={20} color="#00364A" />
                   </div>
-                  <FeatureList items={[
-                    'Real-time monitoring and alerts',
-                    'Scheduled monitoring',
-                    'AI-powered site layout monitoring'
-                  ]} />
+                  <h3 style={{
+                    fontSize: '20px',
+                    fontWeight: '700',
+                    color: '#00364A',
+                    margin: 0
+                  }}>
+                    Monitor
+                  </h3>
                 </div>
+                <FeatureList items={[
+                  'Real-time monitoring and alerts',
+                  'Scheduled monitoring',
+                  'AI-powered site layout monitoring'
+                ]} />
+              </div>
 
-                {/* Integrate Column */}
-                <div>
+              {/* Integrate Column */}
+              <div>
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '10px',
+                  marginBottom: '25px'
+                }}>
                   <div style={{
+                    width: '40px',
+                    height: '40px',
+                    backgroundColor: '#E0F2FE',
+                    borderRadius: '10px',
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '10px',
-                    marginBottom: '25px'
+                    justifyContent: 'center'
                   }}>
-                    <div style={{
-                      width: '40px',
-                      height: '40px',
-                      backgroundColor: '#E0F2FE',
-                      borderRadius: '10px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center'
-                    }}>
-                      <Link2 size={20} color="#00364A" />
-                    </div>
-                    <h3 style={{
-                      fontSize: '20px',
-                      fontWeight: '700',
-                      color: '#00364A',
-                      margin: 0
-                    }}>
-                      Integrate
-                    </h3>
+                    <Link2 size={20} color="#00364A" />
                   </div>
-                  <FeatureList items={[
-                    'Google Sheets',
-                    'Airtable',
-                    'Zapier',
-                    'API & Webhooks',
-                    '...or 7,000+ other apps and tools'
-                  ]} />
+                  <h3 style={{
+                    fontSize: '20px',
+                    fontWeight: '700',
+                    color: '#00364A',
+                    margin: 0
+                  }}>
+                    Integrate
+                  </h3>
                 </div>
+                <FeatureList items={[
+                  'Google Sheets',
+                  'Airtable',
+                  'Zapier',
+                  'API & Webhooks',
+                  '...or 7,000+ other apps and tools'
+                ]} />
               </div>
             </div>
           </div>
-        </section>
+        </div>
+      </section>
 
 
       {/* Pricing Section */}
@@ -956,7 +724,7 @@ export default function WebScraperLanding() {
                 Whether your time-saving automation needs are large or small,<br />
                 we're here to help you scale.
               </p>
-              
+
               {/* Billing Toggle */}
               <div style={{
                 display: 'flex',
@@ -964,7 +732,7 @@ export default function WebScraperLanding() {
                 gap: '10px',
                 marginBottom: '50px'
               }}>
-                <button 
+                <button
                   onClick={() => setBillingCycle('monthly')}
                   style={{
                     padding: '10px 30px',
@@ -979,7 +747,7 @@ export default function WebScraperLanding() {
                   }}>
                   MONTHLY
                 </button>
-                <button 
+                <button
                   onClick={() => setBillingCycle('yearly')}
                   style={{
                     padding: '10px 30px',
@@ -1005,7 +773,7 @@ export default function WebScraperLanding() {
               alignItems: 'stretch'
             }}>
               {/* Starter Plan */}
-              <PricingCard 
+              <PricingCard
                 price={billingCycle === 'monthly' ? '$19' : '$190'}
                 period={billingCycle === 'monthly' ? '/month' : '/year'}
                 title="Starter"
@@ -1022,7 +790,7 @@ export default function WebScraperLanding() {
               />
 
               {/* Professional Plan */}
-              <PricingCard 
+              <PricingCard
                 price={billingCycle === 'monthly' ? '$54' : '$540'}
                 period={billingCycle === 'monthly' ? '/month' : '/year'}
                 title="Professional"
@@ -1040,7 +808,7 @@ export default function WebScraperLanding() {
               />
 
               {/* Company Plan */}
-              <PricingCard 
+              <PricingCard
                 price={billingCycle === 'monthly' ? '$89' : '$890'}
                 period={billingCycle === 'monthly' ? '/month' : '/year'}
                 title="Company"
@@ -1088,19 +856,19 @@ export default function WebScraperLanding() {
             flexDirection: 'column',
             gap: '20px'
           }}>
-            <FAQItem 
+            <FAQItem
               question="What is web scraping and how does it work?"
               answer="Web scraping is an automated method of extracting data from websites. Our tool uses AI-powered technology to navigate web pages, identify relevant data, and extract it in a structured format. You simply point and click on the data you need, and our system handles the rest - including pagination, captchas, and data formatting."
             />
-            <FAQItem 
+            <FAQItem
               question="Do I need coding skills to use this platform?"
               answer="No coding skills are required! Our platform is designed with a user-friendly interface that allows you to extract data through simple point-and-click actions. However, for advanced users, we also provide API access and custom scripting options for more complex scraping tasks."
             />
-            <FAQItem 
+            <FAQItem
               question="How does the pricing work for different plans?"
               answer="We offer three flexible pricing tiers to suit different needs. The Starter plan ($19/month) is perfect for individuals, the Professional plan ($54/month) includes advanced features for teams, and the Company plan ($89/month) offers enterprise-grade features with unlimited users. You can save 20% by choosing annual billing."
             />
-            <FAQItem 
+            <FAQItem
               question="Is web scraping legal and ethical?"
               answer="Web scraping is legal when done responsibly and in compliance with website terms of service and applicable laws. Our platform includes built-in rate limiting and respects robots.txt files. We recommend always reviewing the target website's terms of service and ensuring your use case complies with data protection regulations like GDPR."
             />
@@ -1109,12 +877,14 @@ export default function WebScraperLanding() {
       </section>
 
       {/* Contact Us Section */}
-      <section style={{
-        padding: '60px 60px',
-        backgroundColor: '#E0EFFF',
-        position: 'relative',
-        overflow: 'hidden'
-      }}>
+      <section
+        id="contact us"
+        style={{
+          padding: '60px 60px',
+          backgroundColor: '#E0EFFF',
+          position: 'relative',
+          overflow: 'hidden'
+        }}>
         {/* Background Decorative Lines */}
         <div style={{
           position: 'absolute',
@@ -1130,7 +900,7 @@ export default function WebScraperLanding() {
           backgroundSize: '40px 40px',
           pointerEvents: 'none'
         }} />
-        
+
         {/* Decorative Circles */}
         <div style={{
           position: 'absolute',
@@ -1153,9 +923,7 @@ export default function WebScraperLanding() {
           opacity: 0.2
         }} />
 
-        <div 
-        id="contact us"
-        style={{
+        <div style={{
           maxWidth: '1000px',
           margin: '0 auto',
           display: 'flex',
@@ -1218,16 +986,16 @@ export default function WebScraperLanding() {
                 transition: 'all 0.3s',
                 whiteSpace: 'nowrap'
               }}
-              onMouseEnter={(e) => {
-                e.target.style.backgroundColor = '#004d66';
-                e.target.style.transform = 'translateY(-2px)';
-                e.target.style.boxShadow = '0 6px 20px rgba(0, 54, 74, 0.3)';
-              }}
-              onMouseLeave={(e) => {
-                e.target.style.backgroundColor = '#00364A';
-                e.target.style.transform = 'translateY(0)';
-                e.target.style.boxShadow = 'none';
-              }}>
+                onMouseEnter={(e) => {
+                  e.target.style.backgroundColor = '#004d66';
+                  e.target.style.transform = 'translateY(-2px)';
+                  e.target.style.boxShadow = '0 6px 20px rgba(0, 54, 74, 0.3)';
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.backgroundColor = '#00364A';
+                  e.target.style.transform = 'translateY(0)';
+                  e.target.style.boxShadow = 'none';
+                }}>
                 Contact Us
               </button>
             </div>
@@ -1274,58 +1042,58 @@ export default function WebScraperLanding() {
             alignItems: 'flex-start',
             marginBottom: '80px',
             gap: '100px'
-            
+
           }}>
-          
+
             <div style={{
               flex: '0 0 auto'
-            }}> 
+            }}>
               <div style={{
                 display: 'flex',
                 alignItems: 'center',
                 gap: '12px',
                 marginBottom: '30px'
               }}
-              onMouseEnter={(e) => {
-              e.currentTarget.style.transform = 'scale(1.03)';
-              }}
-              onMouseLeave={(e) => {
-              e.currentTarget.style.transform = 'scale(1)';
-              }}>
-                  
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = 'scale(1.03)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = 'scale(1)';
+                }}>
+
                 <div style={{
                   position: 'relative',
                   width: '36px',
                   height: '36px',
                   flexShrink: 0
                 }}>
-                <Layers
-                  size={36}
-                  strokeWidth={2.5}
-                  color="#00364A"
-                />
-                <Activity
-                  size={22}
-                  strokeWidth={2.5}
-                  color="#49A3C4"
-                  style={{
-                  position: 'absolute',
-                  top: '50%',
-                  left: '50%',
-                  transform: 'translate(-50%, -50%)'
-                }}/>
-              </div>
+                  <Layers
+                    size={36}
+                    strokeWidth={2.5}
+                    color="#00364A"
+                  />
+                  <Activity
+                    size={22}
+                    strokeWidth={2.5}
+                    color="#49A3C4"
+                    style={{
+                      position: 'absolute',
+                      top: '50%',
+                      left: '50%',
+                      transform: 'translate(-50%, -50%)'
+                    }} />
+                </div>
 
-              {/* Brand Name */}
-              <h3 style={{
-                fontSize: '36px',
-                fontWeight: '800',
-                color: '#00364A',
-                margin: 0
-              }}>
-                SCOUT
-              </h3>  
-            </div>
+                {/* Brand Name */}
+                <h3 style={{
+                  fontSize: '36px',
+                  fontWeight: '800',
+                  color: '#00364A',
+                  margin: 0
+                }}>
+                  SCOUT
+                </h3>
+              </div>
 
 
               <p style={{
@@ -1426,8 +1194,8 @@ export default function WebScraperLanding() {
                   marginBottom: '20px',
                   transition: 'color 0.3s'
                 }}
-                onMouseEnter={(e) => e.target.style.color = '#49A3C4'}
-                onMouseLeave={(e) => e.target.style.color = '#00364A'}>
+                  onMouseEnter={(e) => e.target.style.color = '#49A3C4'}
+                  onMouseLeave={(e) => e.target.style.color = '#00364A'}>
                   Home
                 </a>
                 <a href="#" style={{
@@ -1439,8 +1207,8 @@ export default function WebScraperLanding() {
                   marginBottom: '20px',
                   transition: 'color 0.3s'
                 }}
-                onMouseEnter={(e) => e.target.style.color = '#49A3C4'}
-                onMouseLeave={(e) => e.target.style.color = '#00364A'}>
+                  onMouseEnter={(e) => e.target.style.color = '#49A3C4'}
+                  onMouseLeave={(e) => e.target.style.color = '#00364A'}>
                   Blog
                 </a>
                 <a href="#" style={{
@@ -1451,8 +1219,8 @@ export default function WebScraperLanding() {
                   display: 'block',
                   transition: 'color 0.3s'
                 }}
-                onMouseEnter={(e) => e.target.style.color = '#49A3C4'}
-                onMouseLeave={(e) => e.target.style.color = '#00364A'}>
+                  onMouseEnter={(e) => e.target.style.color = '#49A3C4'}
+                  onMouseLeave={(e) => e.target.style.color = '#00364A'}>
                   Pricing
                 </a>
               </div>
@@ -1466,8 +1234,8 @@ export default function WebScraperLanding() {
                   display: 'block',
                   transition: 'color 0.3s'
                 }}
-                onMouseEnter={(e) => e.target.style.color = '#49A3C4'}
-                onMouseLeave={(e) => e.target.style.color = '#00364A'}>
+                  onMouseEnter={(e) => e.target.style.color = '#49A3C4'}
+                  onMouseLeave={(e) => e.target.style.color = '#00364A'}>
                   Redeem Code
                 </a>
               </div>
@@ -1501,18 +1269,18 @@ export default function WebScraperLanding() {
                   transition: 'all 0.3s',
                   border: '2px solid transparent'
                 }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = 'white';
-                  e.currentTarget.style.borderColor = '#49A3C4';
-                  e.currentTarget.style.transform = 'translateY(-3px)';
-                  e.currentTarget.style.boxShadow = '0 6px 15px rgba(73, 163, 196, 0.3)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = 'rgba(0, 54, 74, 0.1)';
-                  e.currentTarget.style.borderColor = 'transparent';
-                  e.currentTarget.style.transform = 'translateY(0)';
-                  e.currentTarget.style.boxShadow = 'none';
-                }}>
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = 'white';
+                    e.currentTarget.style.borderColor = '#49A3C4';
+                    e.currentTarget.style.transform = 'translateY(-3px)';
+                    e.currentTarget.style.boxShadow = '0 6px 15px rgba(73, 163, 196, 0.3)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = 'rgba(0, 54, 74, 0.1)';
+                    e.currentTarget.style.borderColor = 'transparent';
+                    e.currentTarget.style.transform = 'translateY(0)';
+                    e.currentTarget.style.boxShadow = 'none';
+                  }}>
                   <span style={{ fontSize: '22px', color: '#00364A', fontWeight: '600' }}>𝕏</span>
                 </a>
                 <a href="#" style={{
@@ -1527,18 +1295,18 @@ export default function WebScraperLanding() {
                   transition: 'all 0.3s',
                   border: '2px solid transparent'
                 }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = 'white';
-                  e.currentTarget.style.borderColor = '#49A3C4';
-                  e.currentTarget.style.transform = 'translateY(-3px)';
-                  e.currentTarget.style.boxShadow = '0 6px 15px rgba(73, 163, 196, 0.3)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = 'rgba(0, 54, 74, 0.1)';
-                  e.currentTarget.style.borderColor = 'transparent';
-                  e.currentTarget.style.transform = 'translateY(0)';
-                  e.currentTarget.style.boxShadow = 'none';
-                }}>
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = 'white';
+                    e.currentTarget.style.borderColor = '#49A3C4';
+                    e.currentTarget.style.transform = 'translateY(-3px)';
+                    e.currentTarget.style.boxShadow = '0 6px 15px rgba(73, 163, 196, 0.3)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = 'rgba(0, 54, 74, 0.1)';
+                    e.currentTarget.style.borderColor = 'transparent';
+                    e.currentTarget.style.transform = 'translateY(0)';
+                    e.currentTarget.style.boxShadow = 'none';
+                  }}>
                   <span style={{ fontSize: '20px', color: '#00364A' }}>💬</span>
                 </a>
                 <a href="#" style={{
@@ -1553,18 +1321,18 @@ export default function WebScraperLanding() {
                   transition: 'all 0.3s',
                   border: '2px solid transparent'
                 }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = 'white';
-                  e.currentTarget.style.borderColor = '#49A3C4';
-                  e.currentTarget.style.transform = 'translateY(-3px)';
-                  e.currentTarget.style.boxShadow = '0 6px 15px rgba(73, 163, 196, 0.3)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = 'rgba(0, 54, 74, 0.1)';
-                  e.currentTarget.style.borderColor = 'transparent';
-                  e.currentTarget.style.transform = 'translateY(0)';
-                  e.currentTarget.style.boxShadow = 'none';
-                }}>
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = 'white';
+                    e.currentTarget.style.borderColor = '#49A3C4';
+                    e.currentTarget.style.transform = 'translateY(-3px)';
+                    e.currentTarget.style.boxShadow = '0 6px 15px rgba(73, 163, 196, 0.3)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = 'rgba(0, 54, 74, 0.1)';
+                    e.currentTarget.style.borderColor = 'transparent';
+                    e.currentTarget.style.transform = 'translateY(0)';
+                    e.currentTarget.style.boxShadow = 'none';
+                  }}>
                   <span style={{ fontSize: '20px', color: '#00364A' }}>▶</span>
                 </a>
               </div>
@@ -1602,8 +1370,8 @@ export default function WebScraperLanding() {
               opacity: 0.7,
               transition: 'opacity 0.3s'
             }}
-            onMouseEnter={(e) => e.target.style.opacity = '1'}
-            onMouseLeave={(e) => e.target.style.opacity = '0.7'}>
+              onMouseEnter={(e) => e.target.style.opacity = '1'}
+              onMouseLeave={(e) => e.target.style.opacity = '0.7'}>
               Terms
             </a>
             <span style={{
@@ -1620,8 +1388,8 @@ export default function WebScraperLanding() {
               opacity: 0.7,
               transition: 'opacity 0.3s'
             }}
-            onMouseEnter={(e) => e.target.style.opacity = '1'}
-            onMouseLeave={(e) => e.target.style.opacity = '0.7'}>
+              onMouseEnter={(e) => e.target.style.opacity = '1'}
+              onMouseLeave={(e) => e.target.style.opacity = '0.7'}>
               Privacy
             </a>
           </div>
@@ -1708,7 +1476,7 @@ function ContactRobot() {
             boxShadow: '0 0 8px rgba(73, 163, 196, 0.6)'
           }} />
         </div>
-        
+
         {/* Eyes */}
         <div style={{
           display: 'flex',
@@ -1855,7 +1623,7 @@ function FAQItem({ question, answer }) {
           {isOpen ? '−' : '+'}
         </div>
       </button>
-      
+
       <div style={{
         maxHeight: isOpen ? '500px' : '0',
         overflow: 'hidden',
@@ -2017,20 +1785,20 @@ function PricingCard({ price, period, title, description, features, buttonText, 
         transition: 'all 0.3s',
         width: '100%'
       }}
-      onMouseEnter={(e) => {
-        if (isCompanyPlan) {
-          e.target.style.backgroundColor = '#F0F9FF';
-        } else {
-          e.target.style.backgroundColor = '#3D5A66';
-        }
-        e.target.style.transform = 'translateY(-2px)';
-        e.target.style.boxShadow = '0 6px 20px rgba(0, 0, 0, 0.15)';
-      }}
-      onMouseLeave={(e) => {
-        e.target.style.backgroundColor = isCompanyPlan ? 'white' : '#4D7280';
-        e.target.style.transform = 'translateY(0)';
-        e.target.style.boxShadow = 'none';
-      }}>
+        onMouseEnter={(e) => {
+          if (isCompanyPlan) {
+            e.target.style.backgroundColor = '#F0F9FF';
+          } else {
+            e.target.style.backgroundColor = '#3D5A66';
+          }
+          e.target.style.transform = 'translateY(-2px)';
+          e.target.style.boxShadow = '0 6px 20px rgba(0, 0, 0, 0.15)';
+        }}
+        onMouseLeave={(e) => {
+          e.target.style.backgroundColor = isCompanyPlan ? 'white' : '#4D7280';
+          e.target.style.transform = 'translateY(0)';
+          e.target.style.boxShadow = 'none';
+        }}>
         {buttonText}
       </button>
     </div>
@@ -2191,7 +1959,7 @@ function UseCaseCard({ icon, title, description }) {
   const [isHovered, setIsHovered] = React.useState(false);
 
   return (
-    <div 
+    <div
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
       style={{
@@ -2237,8 +2005,8 @@ function UseCaseCard({ icon, title, description }) {
         fontSize: '28px',
         color: '#fff',        // Ensures icon is bright and outline-free
         lineHeight: 1
-        
-      
+
+
       }}>
 
         {icon}
@@ -2293,7 +2061,7 @@ function RobotAnimation() {
     const handleMouseMove = (e) => {
       setMousePosition({ x: e.clientX, y: e.clientY });
     };
-    
+
     window.addEventListener('mousemove', handleMouseMove);
     return () => window.removeEventListener('mousemove', handleMouseMove);
   }, []);
@@ -2303,7 +2071,7 @@ function RobotAnimation() {
     const dy = mousePosition.y - robotY;
     const angle = Math.atan2(dy, dx);
     const distance = Math.min(Math.sqrt(dx * dx + dy * dy) / 100, 5);
-    
+
     return {
       x: Math.cos(angle) * distance,
       y: Math.sin(angle) * distance
@@ -2334,7 +2102,7 @@ function RobotAnimation() {
   };
 
   return (
-    <div 
+    <div
       onMouseEnter={handleRobotMouseEnter}
       onMouseLeave={handleRobotMouseLeave}
       onClick={handleRobotClick}
@@ -2353,7 +2121,7 @@ function RobotAnimation() {
         transition: 'all 0.3s',
         transform: isHovered ? 'scale(1.05)' : 'scale(1)'
       }}>
-      
+
       {/* Thought Cloud */}
       {isHovered && (
         <div style={{
@@ -2434,7 +2202,7 @@ function RobotAnimation() {
               boxShadow: '0 0 10px rgba(73, 163, 196, 0.5)'
             }} />
           </div>
-          
+
           {/* Eyes */}
           <div style={{
             display: 'flex',
@@ -2563,12 +2331,12 @@ function InteractiveEye({ mousePosition, position }) {
       const rect = eyeRef.current.getBoundingClientRect();
       const eyeCenterX = rect.left + rect.width / 2;
       const eyeCenterY = rect.top + rect.height / 2;
-      
+
       const dx = mousePosition.x - eyeCenterX;
       const dy = mousePosition.y - eyeCenterY;
       const angle = Math.atan2(dy, dx);
       const distance = Math.min(Math.sqrt(dx * dx + dy * dy) / 80, 4);
-      
+
       setEyePosition({
         x: Math.cos(angle) * distance,
         y: Math.sin(angle) * distance
@@ -2577,7 +2345,7 @@ function InteractiveEye({ mousePosition, position }) {
   }, [mousePosition]);
 
   return (
-    <div 
+    <div
       ref={eyeRef}
       style={{
         width: '26px',
